@@ -97,6 +97,7 @@ public:
   bool callbackResetMap(std_srvs::Empty::Request& req, std_srvs::Empty::Response& resp);
 
   void callback3dLidarCloud2(mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>& wrp);
+  void callbackDepthCamCloud2(mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>& wrp);
   void callbackLaserScan(mrs_lib::SubscribeHandler<sensor_msgs::LaserScan>& wrp);
   bool loadFromFile(const std::string& filename);
   bool saveToFile(const std::string& filename);
@@ -110,6 +111,7 @@ private:
   mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics> sh_control_manager_diag_;
   mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>            sh_height_;
   mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>            sh_3dlaser_pc2_;
+  mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>            sh_depth_cam_pc2_;
   mrs_lib::SubscribeHandler<sensor_msgs::LaserScan>              sh_laser_scan_;
 
   // | ----------------------- publishers ----------------------- |
@@ -396,6 +398,7 @@ void OctomapServer::onInit() {
   sh_control_manager_diag_ = mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics>(shopts, "control_manager_diagnostics_in");
   sh_height_               = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "height_in");
   sh_3dlaser_pc2_          = mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>(shopts, "point_cloud_in", &OctomapServer::callback3dLidarCloud2, this);
+  sh_depth_cam_pc2_        = mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>(shopts, "depth_cam_pc2_in", &OctomapServer::callbackDepthCamCloud2, this);
   sh_laser_scan_           = mrs_lib::SubscribeHandler<sensor_msgs::LaserScan>(shopts, "laser_scan_in", &OctomapServer::callbackLaserScan, this);
 
   //}
@@ -619,6 +622,138 @@ void OctomapServer::callback3dLidarCloud2(mrs_lib::SubscribeHandler<sensor_msgs:
       }
     }
   }
+
+  free_vectors_pc->header = pc->header;
+
+  // Voxelize data
+  {
+    pcl::VoxelGrid<PCLPoint> vg;
+    vg.setInputCloud(pc);
+    vg.setLeafSize(1.0, 1.0, 1.0);
+    vg.filter(*pc);
+  }
+
+  {
+    pcl::VoxelGrid<PCLPoint> vg;
+    vg.setInputCloud(free_vectors_pc);
+    vg.setLeafSize(2.0, 2.0, 2.0);
+    vg.filter(*free_vectors_pc);
+  }
+
+  // transform to the map frame
+
+  pcl::transformPointCloud(*pc, *pc, sensorToWorld);
+  pcl::transformPointCloud(*free_vectors_pc, *free_vectors_pc, sensorToWorld);
+
+  pc->header.frame_id              = _world_frame_;
+  free_vectors_pc->header.frame_id = _world_frame_;
+
+  insertPointCloud(sensorToWorldTf.transform.translation, pc, free_vectors_pc);
+
+  const octomap::point3d sensor_origin = octomap::pointTfToOctomap(sensorToWorldTf.transform.translation);
+
+  {
+    std::scoped_lock lock(mutex_avg_time_cloud_insertion_);
+
+    ros::Time time_end = ros::Time::now();
+
+    double exec_duration = (time_end - time_start).toSec();
+
+    double coef               = 0.95;
+    avg_time_cloud_insertion_ = coef * avg_time_cloud_insertion_ + (1.0 - coef) * exec_duration;
+
+    ROS_INFO_THROTTLE(5.0, "[OctomapServer]: avg cloud insertion time = %.3f sec", avg_time_cloud_insertion_);
+  }
+}
+
+//}
+
+/* callbackDepthCamCloud2() //{ */
+
+void OctomapServer::callbackDepthCamCloud2(mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>& wrp) {
+
+  if (!is_initialized_) {
+    return;
+  }
+
+  if (!octree_initialized_) {
+    return;
+  }
+
+  if (!_map_while_grounded_) {
+
+    if (!sh_control_manager_diag_.hasMsg()) {
+
+      ROS_WARN_THROTTLE(1.0, "[OctomapServer]: missing control manager diagnostics, can not integrate data!");
+      return;
+
+    } else {
+
+      ros::Time last_time = sh_control_manager_diag_.lastMsgTime();
+
+      if ((ros::Time::now() - last_time).toSec() > 1.0) {
+        ROS_WARN_THROTTLE(1.0, "[OctomapServer]: control manager diagnostics too old, can not integrate data!");
+        return;
+      }
+
+      // TODO is this the best option?
+      if (!sh_control_manager_diag_.getMsg()->flying_normally) {
+        ROS_INFO_THROTTLE(1.0, "[OctomapServer]: not flying normally, therefore, not integrating data");
+        return;
+      }
+    }
+  }
+
+  sensor_msgs::PointCloud2ConstPtr cloud = wrp.getMsg();
+
+  ros::Time time_start = ros::Time::now();
+
+  PCLPointCloud::Ptr pc              = boost::make_shared<PCLPointCloud>();
+  PCLPointCloud::Ptr free_vectors_pc = boost::make_shared<PCLPointCloud>();
+  pcl::fromROSMsg(*cloud, *pc);
+
+  auto res = transformer_.getTransform(cloud->header.frame_id, _world_frame_, cloud->header.stamp);
+
+  if (!res) {
+    ROS_WARN_THROTTLE(1.0, "[OctomapServer]: insertCloudScanCallback(): could not find tf from %s to %s", cloud->header.frame_id.c_str(),
+                      _world_frame_.c_str());
+    return;
+  }
+
+  Eigen::Matrix4f                 sensorToWorld;
+  geometry_msgs::TransformStamped sensorToWorldTf = res.value().getTransform();
+  pcl_ros::transformAsMatrix(sensorToWorldTf.transform, sensorToWorld);
+
+  /* // compute free rays, if required */
+  /* if (_unknown_rays_update_free_space_) { */
+
+  /*   /1* Eigen::Affine3d s2w = tf2::transformToEigen(sensorToWorldTf); *1/ */
+
+  /*   /1* const auto tf_rot = s2w.rotation(); *1/ */
+  /*   /1* // origin of all rays of the lidar sensor *1/ */
+  /*   /1* const vec3_t origin_pt = s2w.translation(); *1/ */
+
+  /*   // go through all points in the cloud and update voxels in the helper voxelmap that the rays */
+  /*   // from the sensor origin to the point go through according to how long part of the ray */
+  /*   // intersects the voxel */
+  /*   for (int i = 0; i < pc->size(); i++) { */
+
+  /*     pcl::PointXYZ pt = pc->at(i); */
+
+  /*     if (!std::isfinite(pt.x) || !std::isfinite(pt.y) || !std::isfinite(pt.z)) { */
+
+  /*       const vec3_t ray_vec = m_sensor_3d_xyz_lut.directions.col(i); */
+
+  /*       if (ray_vec(2) > 0.0) { */
+  /*         pt.x = ray_vec(0) * float(_unknown_rays_distance_); */
+  /*         pt.y = ray_vec(1) * float(_unknown_rays_distance_); */
+  /*         pt.z = ray_vec(2) * float(_unknown_rays_distance_); */
+
+  /*         free_vectors_pc->push_back(pt); */
+  /*       } */
+  /*     } */
+  /*   } */
+  /* } */
 
   free_vectors_pc->header = pc->header;
 
