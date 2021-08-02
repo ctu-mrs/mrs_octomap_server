@@ -7,8 +7,6 @@
   <arg name="standalone" default="false" />
   <arg name="custom_config" default="" />
 
-  <arg name="3d_lidar_topic" default="~REMAP_ME" />
-  <arg name="2d_lidar_topic" default="~REMAP_ME" />
   <arg name="depth_cam_pc2_topic" default="~REMAP_ME" />
 
   <arg name="map_path" default="$(env HOME)/maps" />
@@ -39,7 +37,7 @@
 
     <node pkg="nodelet" type="nodelet" name="octomap_server" args="$(arg nodelet) mrs_octomap_server/MrsOctomapServer $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)">
 
-      <rosparam file="$(find mrs_octomap_server)/config/params_ouster.yaml" />
+      <rosparam file="$(find mrs_octomap_server)/config/params_realsense.yaml" />
       <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
 
       <param name="uav_name" type="string" value="$(arg UAV_NAME)" />
@@ -52,10 +50,6 @@
 
       <!-- topics in -->
 
-      <!-- 3D lidar -->
-      <remap from="~point_cloud_in" to="$(arg 3d_lidar_topic)" />
-      <!-- 2D lidar -->
-      <remap from="~laser_scan_in" to="$(arg 2d_lidar_topic)" />
       <!-- Depth cam -->
       <remap from="~depth_cam_pc2_in" to="$(arg depth_cam_pc2_topic)" />
 
