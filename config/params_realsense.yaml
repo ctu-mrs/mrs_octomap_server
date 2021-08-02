@@ -53,19 +53,20 @@ unknown_rays:
 
   update_free_space: true
   clear_occupied: false # beware, setting this to true is very dangerous
-  ray_distance: 15.0
+  ray_distance: 10.0
 
 # for point cloud raycasting
 sensor_params_3d:
 
   enabled: true
-  vertical_fov_angle: deg(33.2)
-  vertical_rays: 16
-  horizontal_rays: 64 # default 2048
+  horizontal_fov_angle: deg(86.0)
+  vertical_fov_angle: deg(57.0)
+  vertical_rays: 23
+  horizontal_rays: 40 # default 2048
 
 sensor_model:
 
-  max_range: 20.0
+  max_range: 10.0
 
   hit: 0.95  # [0, 1]
   miss: 0.45 # [0, 1]

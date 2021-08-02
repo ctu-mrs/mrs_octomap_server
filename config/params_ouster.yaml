@@ -59,6 +59,7 @@ unknown_rays:
 sensor_params_3d:
 
   enabled: true
+  horizontal_fov_angle: deg(360.0)
   vertical_fov_angle: deg(33.2)
   vertical_rays: 16
   horizontal_rays: 64 # default 2048
