@@ -1,6 +1,6 @@
 resolution: 1.00 # [m]
 
-map_while_grounded: false
+map_while_grounded: true 
 
 persistency:
 
@@ -61,7 +61,7 @@ sensor_params_3d:
   enabled: true
   horizontal_fov_angle: deg(86.0)
   vertical_fov_angle: deg(57.0)
-  vertical_rays: 23
+  vertical_rays: 24
   horizontal_rays: 40 # default 2048
 
 sensor_model:

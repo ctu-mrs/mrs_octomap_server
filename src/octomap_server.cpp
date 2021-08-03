@@ -41,6 +41,7 @@
 #include <mrs_lib/subscribe_handler.h>
 #include <mrs_lib/mutex.h>
 #include <mrs_lib/scope_timer.h>
+#include <mrs_lib/batch_visualizer.h>
 
 #include <mrs_msgs/String.h>
 #include <mrs_msgs/ControlManagerDiagnostics.h>
@@ -97,7 +98,7 @@ public:
   bool callbackResetMap(std_srvs::Empty::Request& req, std_srvs::Empty::Response& resp);
 
   void callback3dLidarCloud2(mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>& wrp);
-  /* void callbackDepthCamCloud2(mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>& wrp); */
+  void callbackDepthCamCloud2(mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>& wrp);
   void callbackLaserScan(mrs_lib::SubscribeHandler<sensor_msgs::LaserScan>& wrp);
   bool loadFromFile(const std::string& filename);
   bool saveToFile(const std::string& filename);
@@ -167,7 +168,8 @@ private:
   bool   _local_map_publish_full_;
   bool   _local_map_publish_binary_;
 
-  mrs_lib::Transformer transformer_;
+  mrs_lib::Transformer     transformer_;
+  /* mrs_lib::BatchVisualizer bv_; */
 
   std::shared_ptr<OcTree_t> octree_;
   std::mutex                mutex_octree_;
@@ -238,7 +240,8 @@ private:
 
   virtual void insertPointCloud(const geometry_msgs::Vector3& sensorOrigin, const PCLPointCloud::ConstPtr& cloud, const PCLPointCloud::ConstPtr& free_cloud);
 
-  void initializeSensorLUT(const size_t w, const size_t h);
+  /* void initializeLidarLUT(const size_t w, const size_t h); */
+  void initializeDepthCamLUT(const size_t w, const size_t h);
 
   xyz_lut_t m_sensor_3d_xyz_lut;
   bool      m_sensor_3d_params_enabled;
@@ -322,11 +325,18 @@ void OctomapServer::onInit() {
 
   //}
 
+  mrs_lib::SubscribeHandlerOptions shopts;
+  shopts.nh        = nh_;
+  shopts.node_name = "OctomapServer";
+
+  /* bv_ = mrs_lib::BatchVisualizer(nh_, "debug_markers", "uav1/rs_d435/aligned_depth_to_color_optical"); */
+
   /* initialize sensor LUT model //{ */
 
   if (m_sensor_3d_params_enabled) {
 
-    initializeSensorLUT(m_sensor_3d_hrays, m_sensor_3d_vrays);
+    /* initializeLidarLUT(m_sensor_3d_hrays, m_sensor_3d_vrays); */
+    initializeDepthCamLUT(m_sensor_3d_hrays, m_sensor_3d_vrays);
   }
 
   //}
@@ -388,9 +398,6 @@ void OctomapServer::onInit() {
 
   /* subscribers //{ */
 
-  mrs_lib::SubscribeHandlerOptions shopts;
-  shopts.nh                 = nh_;
-  shopts.node_name          = "OctomapServer";
   shopts.no_message_timeout = mrs_lib::no_timeout;
   shopts.threadsafe         = true;
   shopts.autostart          = true;
@@ -401,8 +408,7 @@ void OctomapServer::onInit() {
   sh_height_               = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "height_in");
   sh_3dlaser_pc2_          = mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>(shopts, "point_cloud_in", &OctomapServer::callback3dLidarCloud2, this);
   sh_depth_cam_pc2_        = mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>(shopts, "depth_cam_pc2_in", &OctomapServer::callback3dLidarCloud2, this);
-  /* sh_depth_cam_pc2_        = mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>(shopts, "depth_cam_pc2_in", &OctomapServer::callbackDepthCamCloud2, this);
-   */
+  /* sh_depth_cam_pc2_ = mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>(shopts, "depth_cam_pc2_in", &OctomapServer::callbackDepthCamCloud2, this); */
   sh_laser_scan_ = mrs_lib::SubscribeHandler<sensor_msgs::LaserScan>(shopts, "laser_scan_in", &OctomapServer::callbackLaserScan, this);
 
   //}
@@ -540,7 +546,7 @@ void OctomapServer::callbackLaserScan(mrs_lib::SubscribeHandler<sensor_msgs::Las
 
 //}
 
-/* insertCloudCallback() //{ */
+/* callback3dLidarCloud2() //{ */
 
 void OctomapServer::callback3dLidarCloud2(mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>& wrp) {
 
@@ -551,6 +557,9 @@ void OctomapServer::callback3dLidarCloud2(mrs_lib::SubscribeHandler<sensor_msgs:
   if (!octree_initialized_) {
     return;
   }
+
+  /* bv_.publish(); */
+  /* return; */
 
   if (!_map_while_grounded_) {
 
@@ -599,28 +608,27 @@ void OctomapServer::callback3dLidarCloud2(mrs_lib::SubscribeHandler<sensor_msgs:
   // compute free rays, if required
   if (_unknown_rays_update_free_space_) {
 
-    /* Eigen::Affine3d s2w = tf2::transformToEigen(sensorToWorldTf); */
+    Eigen::Affine3d s2w = tf2::transformToEigen(sensorToWorldTf);
 
-    /* const auto tf_rot = s2w.rotation(); */
-    /* // origin of all rays of the lidar sensor */
-    /* const vec3_t origin_pt = s2w.translation(); */
+    const auto tf_rot = Eigen::Quaterniond(s2w.rotation());
 
     // go through all points in the cloud and update voxels in the helper voxelmap that the rays
     // from the sensor origin to the point go through according to how long part of the ray
     // intersects the voxel
+
     for (int i = 0; i < pc->size(); i++) {
 
       pcl::PointXYZ pt = pc->at(i);
 
       if (!std::isfinite(pt.x) || !std::isfinite(pt.y) || !std::isfinite(pt.z)) {
 
-        const vec3_t ray_vec = m_sensor_3d_xyz_lut.directions.col(i);
+        const vec3_t v = m_sensor_3d_xyz_lut.directions.col(i);
 
-        if (ray_vec(2) > 0.0) {
-          pt.x = ray_vec(0) * float(_unknown_rays_distance_);
-          pt.y = ray_vec(1) * float(_unknown_rays_distance_);
-          pt.z = ray_vec(2) * float(_unknown_rays_distance_);
+        pt.z = float(v(2) * _unknown_rays_distance_);
 
+        if (pt.z > 0.0) {
+          pt.x = float(v(0) * _unknown_rays_distance_);
+          pt.y = float(v(1) * _unknown_rays_distance_);
           free_vectors_pc->push_back(pt);
         }
       }
@@ -671,148 +679,6 @@ void OctomapServer::callback3dLidarCloud2(mrs_lib::SubscribeHandler<sensor_msgs:
 }
 
 //}
-
-/* /1* callbackDepthCamCloud2() //{ *1/ */
-
-/* void OctomapServer::callbackDepthCamCloud2(mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>& wrp) { */
-
-/*   if (!is_initialized_) { */
-/*     return; */
-/*   } */
-
-/*   if (!octree_initialized_) { */
-/*     return; */
-/*   } */
-
-/*   if (!_map_while_grounded_) { */
-
-/*     if (!sh_control_manager_diag_.hasMsg()) { */
-
-/*       ROS_WARN_THROTTLE(1.0, "[OctomapServer]: missing control manager diagnostics, can not integrate data!"); */
-/*       return; */
-
-/*     } else { */
-
-/*       ros::Time last_time = sh_control_manager_diag_.lastMsgTime(); */
-
-/*       if ((ros::Time::now() - last_time).toSec() > 1.0) { */
-/*         ROS_WARN_THROTTLE(1.0, "[OctomapServer]: control manager diagnostics too old, can not integrate data!"); */
-/*         return; */
-/*       } */
-
-/*       // TODO is this the best option? */
-/*       if (!sh_control_manager_diag_.getMsg()->flying_normally) { */
-/*         ROS_INFO_THROTTLE(1.0, "[OctomapServer]: not flying normally, therefore, not integrating data"); */
-/*         return; */
-/*       } */
-/*     } */
-/*   } */
-
-/*   sensor_msgs::PointCloud2ConstPtr cloud = wrp.getMsg(); */
-
-/*   ros::Time time_start = ros::Time::now(); */
-
-/*   PCLPointCloud::Ptr pc              = boost::make_shared<PCLPointCloud>(); */
-/*   PCLPointCloud::Ptr free_vectors_pc = boost::make_shared<PCLPointCloud>(); */
-/*   pcl::fromROSMsg(*cloud, *pc); */
-
-/*   auto res = transformer_.getTransform(cloud->header.frame_id, _world_frame_, cloud->header.stamp); */
-
-/*   if (!res) { */
-/*     ROS_WARN_THROTTLE(1.0, "[OctomapServer]: insertCloudScanCallback(): could not find tf from %s to %s", cloud->header.frame_id.c_str(), */
-/*                       _world_frame_.c_str()); */
-/*     return; */
-/*   } */
-
-/*   Eigen::Matrix4f                 sensorToWorld; */
-/*   geometry_msgs::TransformStamped sensorToWorldTf = res.value().getTransform(); */
-/*   pcl_ros::transformAsMatrix(sensorToWorldTf.transform, sensorToWorld); */
-
-/*   /1* // compute free rays, if required *1/ */
-/*   if (_unknown_rays_update_free_space_) { */
-
-/*     int horizontal_steps = 20; */
-/*     int vertical_steps   = 20; */
-
-/*     Eigen::Affine3d s2w       = tf2::transformToEigen(sensorToWorldTf); */
-/*     Eigen::Vector3d origin_pt = s2w.translation(); */
-/*     const auto      tf_rot    = s2w.rotation(); */
-
-/*     /1* double horizontal_fov_radians = 1.50098; *1/ */
-/*     /1* double vertical_fov_radians   = 0.994838; *1/ */
-
-/*     double horizontal_fov_radians = 2.7; */
-/*     double vertical_fov_radians   = 1.5; */
-
-/*     double angle_horizontal = horizontal_fov_radians / horizontal_steps; */
-/*     double angle_vertical   = vertical_fov_radians / vertical_steps; */
-
-/*     for (int h = -horizontal_steps / 2; h < horizontal_steps / 2; h++) { */
-/*       for (int v = -vertical_steps / 2; v < vertical_steps / 2; v++) { */
-
-
-/*         Eigen::Vector3d direction(1, 0, 0); */
-/*         Eigen::Matrix3d rot; */
-
-/*         // TODO */
-/*         rot = Eigen::AngleAxisd(0, Eigen::Vector3d::UnitX()) * Eigen::AngleAxisd(angle_vertical, Eigen::Vector3d::UnitY()) * */
-/*               Eigen::AngleAxisd(angle_horizontal, Eigen::Vector3d::UnitZ()); */
-
-/*         Eigen::Vector3d pt_eig = origin_pt + rot * direction; */
-
-/*         pcl::PointXYZ pt; */
-/*         pt.x = pt_eig.x(); */
-/*         pt.y = pt_eig.y(); */
-/*         pt.z = pt_eig.z(); */
-/*         free_vectors_pc->push_back(pt); */
-/*       } */
-/*     } */
-/*   } */
-
-/*   free_vectors_pc->header = pc->header; */
-
-/*   // Voxelize data */
-/*   { */
-/*     pcl::VoxelGrid<PCLPoint> vg; */
-/*     vg.setInputCloud(pc); */
-/*     vg.setLeafSize(1.0, 1.0, 1.0); */
-/*     vg.filter(*pc); */
-/*   } */
-
-/*   { */
-/*     pcl::VoxelGrid<PCLPoint> vg; */
-/*     vg.setInputCloud(free_vectors_pc); */
-/*     vg.setLeafSize(2.0, 2.0, 2.0); */
-/*     vg.filter(*free_vectors_pc); */
-/*   } */
-
-/*   // transform to the map frame */
-
-/*   pcl::transformPointCloud(*pc, *pc, sensorToWorld); */
-/*   pcl::transformPointCloud(*free_vectors_pc, *free_vectors_pc, sensorToWorld); */
-
-/*   pc->header.frame_id              = _world_frame_; */
-/*   free_vectors_pc->header.frame_id = _world_frame_; */
-
-/*   insertPointCloud(sensorToWorldTf.transform.translation, pc, free_vectors_pc); */
-
-/*   const octomap::point3d sensor_origin = octomap::pointTfToOctomap(sensorToWorldTf.transform.translation); */
-
-/*   { */
-/*     std::scoped_lock lock(mutex_avg_time_cloud_insertion_); */
-
-/*     ros::Time time_end = ros::Time::now(); */
-
-/*     double exec_duration = (time_end - time_start).toSec(); */
-
-/*     double coef               = 0.95; */
-/*     avg_time_cloud_insertion_ = coef * avg_time_cloud_insertion_ + (1.0 - coef) * exec_duration; */
-
-/*     ROS_INFO_THROTTLE(5.0, "[OctomapServer]: avg cloud insertion time = %.3f sec", avg_time_cloud_insertion_); */
-/*   } */
-/* } */
-
-/* //} */
 
 // | -------------------- service callbacks ------------------- |
 
@@ -1357,21 +1223,27 @@ void OctomapServer::insertPointCloud(const geometry_msgs::Vector3& sensorOriginT
 
 //}
 
-/* initializeSensorLUT() //{ */
+/* initializeDepthCamLUT() //{ */
+void OctomapServer::initializeDepthCamLUT(const size_t w, const size_t h) {
 
-void OctomapServer::initializeSensorLUT(const size_t w, const size_t h) {
+  const int horizontalRangeCount = w;
+  const int verticalRangeCount   = h;
 
-  const int                                       horizontalRangeCount = w;
-  const int                                       verticalRangeCount   = h;
+  std::cout << "hrays: " << horizontalRangeCount << ", "
+            << "vrays: " << verticalRangeCount << "\n";
+
   std::vector<std::tuple<double, double, double>> coord_coeffs;
-  const double                                    horizontalMinAngle = -m_sensor_3d_hfov / 2.0;
-  const double                                    horizontalMaxAngle = m_sensor_3d_hfov / 2.0;
+  const double                                    horizontalMinAngle = m_sensor_3d_hfov / 2.0;
+  const double                                    horizontalMaxAngle = -m_sensor_3d_hfov / 2.0;
 
-  const double verticalMinAngle = -m_sensor_3d_vfov / 2.0;
-  const double verticalMaxAngle = m_sensor_3d_vfov / 2.0;
+  const double verticalMinAngle = m_sensor_3d_vfov / 2.0;
+  const double verticalMaxAngle = -m_sensor_3d_vfov / 2.0;
 
   const double yDiff = horizontalMaxAngle - horizontalMinAngle;
   const double pDiff = verticalMaxAngle - verticalMinAngle;
+
+  Eigen::Quaterniond rot = Eigen::AngleAxisd(0.5 * M_PI, Eigen::Vector3d::UnitX()) * Eigen::AngleAxisd(0, Eigen::Vector3d::UnitY()) *
+                           Eigen::AngleAxisd(0.5 * M_PI, Eigen::Vector3d::UnitZ());
 
   double yAngle_step = yDiff / (horizontalRangeCount - 1);
 
@@ -1383,8 +1255,10 @@ void OctomapServer::initializeSensorLUT(const size_t w, const size_t h) {
 
   coord_coeffs.reserve(horizontalRangeCount * verticalRangeCount);
 
-  for (int i = 0; i < horizontalRangeCount; i++) {
-    for (int j = 0; j < verticalRangeCount; j++) {
+  /* bv_.clearVisuals(); */
+  /* bv_.clearBuffers(); */
+  for (int j = 0; j < verticalRangeCount; j++) {
+    for (int i = 0; i < horizontalRangeCount; i++) {
 
       // Get angles of ray to get xyz for point
       const double yAngle = i * yAngle_step + horizontalMinAngle;
@@ -1393,9 +1267,23 @@ void OctomapServer::initializeSensorLUT(const size_t w, const size_t h) {
       const double x_coeff = cos(pAngle) * cos(yAngle);
       const double y_coeff = cos(pAngle) * sin(yAngle);
       const double z_coeff = sin(pAngle);
-      coord_coeffs.push_back({x_coeff, y_coeff, z_coeff});
+
+      Eigen::Vector3d p(x_coeff, y_coeff, z_coeff);
+
+      p = rot * p;
+
+      double r = (double)(i) / horizontalRangeCount;
+      double g = (double)(j) / horizontalRangeCount;
+
+      /* /1* std::cout << p.x() << " | " << p.y() << " | " << p.z() << "\n"; *1/ */
+      /* mrs_lib::geometry::Ray ray = mrs_lib::geometry::Ray::twopointCast(Eigen::Vector3d(0, 0, 0), 20 * p); */
+      /* /1* /2* bv_.addPoint(p, r, g, 0, 1); *2/ *1/ */
+      /* bv_.addRay(ray, r, g, 0, 1); */
+
+      coord_coeffs.push_back({p.x(), p.y(), p.z()});
     }
   }
+  /* bv_.publish(); */
 
   int it = 0;
   m_sensor_3d_xyz_lut.directions.resize(3, horizontalRangeCount * verticalRangeCount);
