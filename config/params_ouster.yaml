@@ -59,6 +59,7 @@ unknown_rays:
 sensor_params_3d:
 
   enabled: true
+  sensor_type: "lidar"
   horizontal_fov_angle: deg(360.0)
   vertical_fov_angle: deg(33.2)
   vertical_rays: 16
