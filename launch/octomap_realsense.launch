@@ -35,41 +35,41 @@
       <remap from="points" to="depth_to_pc2/points"/>
     </node>
 
-    <node pkg="nodelet" type="nodelet" name="octomap_server" args="$(arg nodelet) mrs_octomap_server/MrsOctomapServer $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)">
+<!--     <node pkg="nodelet" type="nodelet" name="octomap_server" args="$(arg nodelet) mrs_octomap_server/MrsOctomapServer $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)"> -->
 
-      <rosparam file="$(find mrs_octomap_server)/config/params_realsense.yaml" />
-      <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
+<!--       <rosparam file="$(find mrs_octomap_server)/config/params_realsense.yaml" /> -->
+<!--       <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" /> -->
 
-      <param name="uav_name" type="string" value="$(arg UAV_NAME)" />
-      <param name="simulation" type="bool" value="$(arg simulation)" />
+<!--       <param name="uav_name" type="string" value="$(arg UAV_NAME)" /> -->
+<!--       <param name="simulation" type="bool" value="$(arg simulation)" /> -->
 
-      <param name="world_frame_id" type="string" value="$(arg world_frame_id)" />
-      <param name="robot_frame_id" type="string" value="$(arg robot_frame_id)" />
+<!--       <param name="world_frame_id" type="string" value="$(arg world_frame_id)" /> -->
+<!--       <param name="robot_frame_id" type="string" value="$(arg robot_frame_id)" /> -->
 
-      <param name="map_path" type="string" value="$(arg map_path)" />
+<!--       <param name="map_path" type="string" value="$(arg map_path)" /> -->
 
-      <!-- topics in -->
+<!--       <!-1- topics in -1-> -->
 
-      <!-- Depth cam -->
-      <remap from="~depth_cam_pc2_in" to="$(arg depth_cam_pc2_topic)" />
+<!--       <!-1- Depth cam -1-> -->
+<!--       <remap from="~depth_cam_pc2_in" to="$(arg depth_cam_pc2_topic)" /> -->
 
-      <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" />
-      <remap from="~height_in" to="odometry/height" />
+<!--       <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" /> -->
+<!--       <remap from="~height_in" to="odometry/height" /> -->
 
-      <!-- topics out -->
+<!--       <!-1- topics out -1-> -->
 
-      <remap from="~octomap_global_full_out" to="~octomap_global_full" />
-      <remap from="~octomap_global_binary_out" to="~octomap_global_binary" />
+<!--       <remap from="~octomap_global_full_out" to="~octomap_global_full" /> -->
+<!--       <remap from="~octomap_global_binary_out" to="~octomap_global_binary" /> -->
 
-      <remap from="~octomap_local_full_out" to="~octomap_local_full" />
-      <remap from="~octomap_local_binary_out" to="~octomap_local_binary" />
+<!--       <remap from="~octomap_local_full_out" to="~octomap_local_full" /> -->
+<!--       <remap from="~octomap_local_binary_out" to="~octomap_local_binary" /> -->
 
-        <!-- services -->
-      <remap from="~reset_map_in" to="~reset_map" />
-      <remap from="~save_map_in" to="~save_map" />
-      <remap from="~load_map_in" to="~load_map" />
+<!--         <!-1- services -1-> -->
+<!--       <remap from="~reset_map_in" to="~reset_map" /> -->
+<!--       <remap from="~save_map_in" to="~save_map" /> -->
+<!--       <remap from="~load_map_in" to="~load_map" /> -->
 
-    </node>
+<!--     </node> -->
 
   </group>
 </launch>
