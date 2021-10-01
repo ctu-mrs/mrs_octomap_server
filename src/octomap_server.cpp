@@ -605,7 +605,6 @@ void OctomapServer::callback3dLidarCloud2(mrs_lib::SubscribeHandler<sensor_msgs:
   if (!res) {
     ROS_WARN_THROTTLE(1.0, "[OctomapServer]: insertCloudScanCallback(): could not find tf from %s to %s", cloud->header.frame_id.c_str(),
                       _world_frame_.c_str());
-    return;
   }
 
   Eigen::Matrix4f                 sensorToWorld;
