@@ -1,0 +1,75 @@
+<launch>
+
+  <arg name="UAV_NAME" default="$(env UAV_NAME)" />
+  <arg name="RUN_TYPE" default="$(env RUN_TYPE)" />
+
+  <arg name="debug" default="false" />
+  <arg name="standalone" default="false" />
+  <arg name="custom_config" default="" />
+
+  <arg name="depth_cam_pc2_topic" default="~REMAP_ME" />
+
+  <arg name="map_path" default="$(env HOME)/maps" />
+
+  <arg name="world_frame_id" default="$(arg UAV_NAME)/gps_origin" />
+  <arg name="robot_frame_id" default="$(arg UAV_NAME)/fcu" />
+
+  <arg     if="$(arg debug)" name="launch_prefix" value="debug_roslaunch" />
+  <arg unless="$(arg debug)" name="launch_prefix" value="" />
+
+  <arg name="nodelet_manager_name" default="" />
+  <arg     if="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="standalone" />
+  <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="load" />
+  <arg     if="$(eval arg('standalone') or arg('debug'))" name="nodelet_manager" value="" />
+  <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet_manager" value="$(arg nodelet_manager_name)" />
+
+  <arg if="$(eval arg('RUN_TYPE') == 'simulation')" name="simulation" default="true" />
+  <arg unless="$(eval arg('RUN_TYPE') == 'simulation')" name="simulation" default="false" />
+
+  <group ns="$(arg UAV_NAME)">
+
+    <!-- Depth image to PointCloud2 -->
+    <node pkg="nodelet" type="nodelet" name="depth_to_pc2" args="$(arg nodelet) depth_image_proc/point_cloud_xyz $(arg nodelet_manager)">
+      <remap from="camera_info" to="rs_d435/aligned_depth_to_color/camera_info"/>
+      <remap from="image_rect" to="rs_d435/aligned_depth_to_color/image_raw"/>
+      <remap from="points" to="depth_to_pc2/points"/>
+    </node>
+
+<!--     <node pkg="nodelet" type="nodelet" name="octomap_server" args="$(arg nodelet) mrs_octomap_server/MrsOctomapServer $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)"> -->
+
+<!--       <rosparam file="$(find mrs_octomap_server)/config/params_realsense.yaml" /> -->
+<!--       <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" /> -->
+
+<!--       <param name="uav_name" type="string" value="$(arg UAV_NAME)" /> -->
+<!--       <param name="simulation" type="bool" value="$(arg simulation)" /> -->
+
+<!--       <param name="world_frame_id" type="string" value="$(arg world_frame_id)" /> -->
+<!--       <param name="robot_frame_id" type="string" value="$(arg robot_frame_id)" /> -->
+
+<!--       <param name="map_path" type="string" value="$(arg map_path)" /> -->
+
+<!--       <!-1- topics in -1-> -->
+
+<!--       <!-1- Depth cam -1-> -->
+<!--       <remap from="~depth_cam_pc2_in" to="$(arg depth_cam_pc2_topic)" /> -->
+
+<!--       <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" /> -->
+<!--       <remap from="~height_in" to="odometry/height" /> -->
+
+<!--       <!-1- topics out -1-> -->
+
+<!--       <remap from="~octomap_global_full_out" to="~octomap_global_full" /> -->
+<!--       <remap from="~octomap_global_binary_out" to="~octomap_global_binary" /> -->
+
+<!--       <remap from="~octomap_local_full_out" to="~octomap_local_full" /> -->
+<!--       <remap from="~octomap_local_binary_out" to="~octomap_local_binary" /> -->
+
+<!--         <!-1- services -1-> -->
+<!--       <remap from="~reset_map_in" to="~reset_map" /> -->
+<!--       <remap from="~save_map_in" to="~save_map" /> -->
+<!--       <remap from="~load_map_in" to="~load_map" /> -->
+
+<!--     </node> -->
+
+  </group>
+</launch>

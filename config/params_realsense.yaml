@@ -1,14 +1,6 @@
-map_while_grounded: true
+resolution: 1.00 # [m]
 
-mapping:
-
-  # resolution on the lowest level (fractor = 0, depth = max depth)
-  resolution: 0.05 # [m]
-
-  # fractor = how many levels from the lowest level (the higherst res)
-  #           should we work on
-  # current_resolution = resolution * 2 ^ fractor
-  initial_fractor: 3
+map_while_grounded: false
 
 persistency:
 
@@ -37,8 +29,8 @@ global_map:
   # should we prune the map before publishing?
   compress: true
 
-  publish_full: false # should publish map with full probabilities?
-  publish_binary: true # should publish map with binary occupancy?
+  publish_full: true # should publish map with full probabilities?
+  publish_binary: false # should publish map with binary occupancy?
 
 local_map:
 
@@ -47,35 +39,35 @@ local_map:
 
   # the bounding box distance of the local map
   horizontal_distance: 50.0
-  vertical_distance: 50.0
+  vertical_distance: 25.0
 
   # the publisher rate of the local map
   rate: 10.0 # [Hz]
 
   max_computation_duty_cycle: 0.33
 
-  publish_full: false # should publish map with full probabilities?
-  publish_binary: true # should publish map with binary occupancy?
+  publish_full: true # should publish map with full probabilities?
+  publish_binary: false # should publish map with binary occupancy?
 
 unknown_rays:
 
   update_free_space: true
   clear_occupied: false # beware, setting this to true is very dangerous
-  ray_distance: 15.0
+  ray_distance: 10.0
 
 # for point cloud raycasting
 sensor_params_3d:
 
   enabled: true
-  sensor_type: "lidar"
-  horizontal_fov_angle: deg(360.0)
-  vertical_fov_angle: deg(33.2)
-  vertical_rays: 16
-  horizontal_rays: 64 # default 2048
+  sensor_type: "depthcam"
+  horizontal_fov_angle: deg(86.0)
+  vertical_fov_angle: deg(57.0)
+  vertical_rays: 24
+  horizontal_rays: 40 # default 2048
 
 sensor_model:
 
-  max_range: 20.0
+  max_range: 9.0
 
   hit: 0.95  # [0, 1]
   miss: 0.45 # [0, 1]
