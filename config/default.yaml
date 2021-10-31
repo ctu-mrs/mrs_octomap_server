@@ -64,18 +64,34 @@ unknown_rays:
   ray_distance: 15.0
 
 # for point cloud raycasting
-sensor_params_3d:
+sensor_params:
 
-  enabled: true
-  sensor_type: "lidar"
-  horizontal_fov_angle: deg(360.0)
-  vertical_fov_angle: deg(33.2)
-  vertical_rays: 16
-  horizontal_rays: 64 # default 2048
+  3d_lidar:
+
+    n_sensors: 1
+
+    sensor_1:
+
+      max_range: 20.0 # [m]
+
+      vertical_fov_angle: deg(90.0)
+      vertical_rays: 16
+      horizontal_rays: 64
+
+  depth_camera:
+
+    n_sensors: 1
+
+    sensor_1:
+
+      max_range: 9.0 # [m]
+
+      horizontal_fov_angle: deg(86.0)
+      vertical_fov_angle: deg(57.0)
+      vertical_rays: 24
+      horizontal_rays: 40
 
 sensor_model:
-
-  max_range: 20.0
 
   hit: 0.95  # [0, 1]
   miss: 0.45 # [0, 1]
