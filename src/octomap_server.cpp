@@ -107,6 +107,17 @@ using PCLPointCloud = pcl::PointCloud<PCLPoint>;
 using OcTree_t      = octomap::OcTree;
 #endif
 
+typedef enum
+{
+
+  LIDAR_3D,
+  LIDAR_2D,
+  LIDAR_1D,
+  DEPTH_CAMERA,
+  ULTRASOUND,
+
+} SensorType_t;
+
 //}
 
 /* class OctomapServer //{ */
@@ -123,8 +134,7 @@ public:
 
   bool callbackSetFractor([[maybe_unused]] mrs_msgs::SetInt::Request& req, [[maybe_unused]] mrs_msgs::SetInt::Response& resp);
 
-  void callback3dLidarCloud2(mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>& wrp, const int sensor_id);
-  /* void callback3dLidarCloud2(const sensor_msgs::PointCloud2::ConstPtr& ptr, const int sensor_id); */
+  void callback3dLidarCloud2(mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>& wrp, const SensorType_t sensor_type, const int sensor_id);
   void callbackLaserScan(mrs_lib::SubscribeHandler<sensor_msgs::LaserScan>& wrp);
   bool loadFromFile(const std::string& filename);
   bool saveToFile(const std::string& filename);
@@ -139,12 +149,8 @@ private:
   mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>            sh_height_;
 
   std::vector<mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>> sh_3dlaser_pc2_;
-  /* std::vector<mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>> sh_depth_cam_pc2_; */
-  /* std::vector<mrs_lib::SubscribeHandler<sensor_msgs::LaserScan>> sh_laser_scan_; */
-
-  /* std::vector<ros::Subscriber> sh_3dlaser_pc2_; */
-  std::vector<ros::Subscriber> sh_depth_cam_pc2_;
-  std::vector<ros::Subscriber> sh_laser_scan_;
+  std::vector<mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>> sh_depth_cam_pc2_;
+  std::vector<mrs_lib::SubscribeHandler<sensor_msgs::LaserScan>>   sh_laser_scan_;
 
   // | ----------------------- publishers ----------------------- |
 
@@ -215,7 +221,6 @@ private:
   double     time_last_local_map_processing_ = 0;
   std::mutex mutex_time_local_map_processing_;
 
-  double      _sensor_max_range_;
   std::string _world_frame_;
   std::string _robot_frame_;
   double      octree_resolution_;
@@ -506,22 +511,24 @@ void OctomapServer::onInit() {
   sh_height_               = mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>(shopts, "height_in");
 
   for (int i = 0; i < n_sensors_3d_lidar_; i++) {
+
     std::stringstream ss;
-    ss << "pcl_3d_" << i << "_in";
+    ss << "3d_lidar_" << i << "_in";
 
     sh_3dlaser_pc2_.push_back(
-        mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>(shopts, ss.str(), boost::bind(&OctomapServer::callback3dLidarCloud2, this, _1, i)));
+        mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>(shopts, ss.str(), boost::bind(&OctomapServer::callback3dLidarCloud2, this, _1, LIDAR_3D, i)));
   }
 
-  /* for (int i = 0; i < n_sensors_2d_lidar_; i++) { */
+  for (int i = 0; i < n_sensors_2d_lidar_; i++) {
 
-  /* sh_laser_scan_.push_back( */
-  /* mrs_lib::SubscribeHandler<sensor_msgs::LaserScan>(shopts, "lase_scan_in", std::bind(&OctomapServer::callback3dLidarCloud2, this, _1, i), this)); */
-  /* } */
+    std::stringstream ss;
+    ss << "3d_lidar_" << i << "_in";
 
-  /* sh_depth_cam_pc2_        = mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>(shopts, "depth_cam_pc2_in", &OctomapServer::callback3dLidarCloud2, this);
-   */
-  /* sh_laser_scan_           = mrs_lib::SubscribeHandler<sensor_msgs::LaserScan>(shopts, "laser_scan_in", &OctomapServer::callbackLaserScan, this); */
+    sh_depth_cam_pc2_.push_back(
+        mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>(shopts, ss.str(), boost::bind(&OctomapServer::callback3dLidarCloud2, this, _1, DEPTH_CAMERA, i)));
+  }
+
+  /* sh_laser_scan_ = mrs_lib::SubscribeHandler<sensor_msgs::LaserScan>(shopts, "laser_scan_in", &OctomapServer::callbackLaserScan, this); */
 
   //}
 
@@ -661,7 +668,7 @@ void OctomapServer::callbackLaserScan(mrs_lib::SubscribeHandler<sensor_msgs::Las
 
 /* callback3dLidarCloud2() //{ */
 
-void OctomapServer::callback3dLidarCloud2(mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>& wrp, const int sensor_id) {
+void OctomapServer::callback3dLidarCloud2(mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>& wrp, const SensorType_t sensor_type, const int sensor_id) {
 
   ROS_INFO_THROTTLE(1.0, "[OctomapServer]: got cloud on %d", sensor_id);
 
@@ -710,6 +717,7 @@ void OctomapServer::callback3dLidarCloud2(mrs_lib::SubscribeHandler<sensor_msgs:
 
   if (!res) {
     ROS_WARN_THROTTLE(1.0, "[OctomapServer]: callback3dLidarCloud2(): could not find tf from %s to %s", cloud->header.frame_id.c_str(), _world_frame_.c_str());
+    return;
   }
 
   Eigen::Matrix4f                 sensorToWorld;
@@ -732,10 +740,28 @@ void OctomapServer::callback3dLidarCloud2(mrs_lib::SubscribeHandler<sensor_msgs:
 
       pcl::PointXYZ pt = pc->at(i);
 
-      if (!std::isfinite(pt.x) || !std::isfinite(pt.y) || !std::isfinite(pt.z) || fabs(pt.x) > _sensor_max_range_ || fabs(pt.y) > _sensor_max_range_ ||
-          fabs(pt.z) > _sensor_max_range_) {
+      const double max_range = sensor_params_3d_lidar_[sensor_id].max_range;
 
-        const vec3_t ray_vec = sensor_3d_lidar_xyz_lut_[sensor_id].directions.col(i);
+      if (!std::isfinite(pt.x) || !std::isfinite(pt.y) || !std::isfinite(pt.z) || fabs(pt.x) > max_range || fabs(pt.y) > max_range || fabs(pt.z) > max_range) {
+
+        vec3_t ray_vec;
+
+        switch (sensor_type) {
+
+          case LIDAR_3D: {
+
+            ray_vec = sensor_3d_lidar_xyz_lut_[sensor_id].directions.col(i);
+
+            break;
+          }
+
+          case DEPTH_CAMERA: {
+
+            ray_vec = sensor_depth_camera_xyz_lut_[sensor_id].directions.col(i);
+
+            break;
+          }
+        }
 
         if (ray_vec(2) > 0.0) {
           pt.x = ray_vec(0) * float(_unknown_rays_distance_);

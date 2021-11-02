@@ -48,11 +48,17 @@
       <!-- topics in -->
 
       <!-- 3D lidar -->
-      <remap from="~pcl_3d_0_in" to="$(arg 3d_lidar_topic_0_in)" />
-      <remap from="~pcl_3d_1_in" to="$(arg 3d_lidar_topic_1_in)" />
-      <remap from="~pcl_3d_2_in" to="$(arg 3d_lidar_topic_2_in)" />
+      <remap from="~3d_lidar_0_in" to="$(arg 3d_lidar_topic_0_in)" />
+      <remap from="~3d_lidar_0_in" to="$(arg 3d_lidar_topic_1_in)" />
+      <remap from="~3d_lidar_0_in" to="$(arg 3d_lidar_topic_2_in)" />
       <!-- 2D lidar -->
-      <remap from="~laser_scan_in" to="$(arg 2d_lidar_topic_0_in)" />
+      <remap from="~2d_lidar_0_in" to="$(arg 2d_lidar_topic_0_in)" />
+      <remap from="~2d_lidar_1_in" to="$(arg 2d_lidar_topic_1_in)" />
+      <remap from="~2d_lidar_2_in" to="$(arg 2d_lidar_topic_2_in)" />
+      <!-- depth cam -->
+      <remap from="~dept_camera_0_in" to="$(arg depth_camera_topic_0_in)" />
+      <remap from="~dept_camera_1_in" to="$(arg depth_camera_topic_1_in)" />
+      <remap from="~dept_camera_2_in" to="$(arg depth_camera_topic_2_in)" />
 
       <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" />
       <remap from="~height_in" to="odometry/height" />
