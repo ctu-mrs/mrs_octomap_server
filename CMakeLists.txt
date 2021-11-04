@@ -21,6 +21,7 @@ set(PACKAGE_DEPENDENCIES
   std_msgs
   nav_msgs
   geometry_msgs
+  pcl_ros
   pcl_conversions
   octomap_ros
   octomap_msgs
@@ -30,6 +31,7 @@ set(PACKAGE_DEPENDENCIES
   )
 
 find_package(catkin REQUIRED COMPONENTS ${PACKAGE_DEPENDENCIES})
+find_package(PCL REQUIRED COMPONENTS)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -37,6 +39,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_compile_options("-fPIC")
 add_compile_options("${PCL_COMPILE_OPTIONS}")
+
+message("PCL Compile options: '${PCL_COMPILE_OPTIONS}', pes")
+message("CXX flags: '${CMAKE_CXX_FLAGS}', pes")
 
 find_package(OpenMP REQUIRED)
 
@@ -63,6 +68,16 @@ include_directories(
   ${OCTOMAP_INCLUDE_DIRS}
   )
 
+## Add link directories
+link_directories(
+  ${PCL_LIBRARY_DIRS}
+)
+
+# This causes adds the -march=native gcc flag that prevents ditributed compilation
+add_definitions(
+  ${PCL_DEFINITIONS}
+  )
+
 # MrsOctomapServer
 
 add_library(MrsOctomapServer SHARED
@@ -80,3 +95,5 @@ target_link_libraries(MrsOctomapServer
   ${PCL_LIBRARIES}
   ${OCTOMAP_LIBRARIES}
   )
+
+target_include_directories(MrsOctomapServer SYSTEM PRIVATE ${PCL_INCLUDE_DIRS})

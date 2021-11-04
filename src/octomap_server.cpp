@@ -140,8 +140,8 @@ public:
   bool saveToFile(const std::string& filename);
 
 private:
-  ros::NodeHandle nh_;
-  bool            is_initialized_ = false;
+  ros::NodeHandle   nh_;
+  std::atomic<bool> is_initialized_ = false;
 
   // | -------------------- topic subscribers ------------------- |
 
@@ -281,12 +281,22 @@ private:
   int n_sensors_depth_cam_;
 
   std::vector<xyz_lut_t> sensor_2d_lidar_xyz_lut_;
-  std::vector<xyz_lut_t> sensor_3d_lidar_xyz_lut_;
-  std::vector<xyz_lut_t> sensor_depth_camera_xyz_lut_;
+  std::mutex             mutex_sensor_2d_lidar_xyz_lut_;
 
-  std::vector<SensorParams2DLidar_t>  sensor_params_2d_lidar_;
-  std::vector<SensorParams3DLidar_t>  sensor_params_3d_lidar_;
+  std::vector<xyz_lut_t> sensor_3d_lidar_xyz_lut_;
+  std::mutex             mutex_sensor_3d_lidar_xyz_lut_;
+
+  std::vector<xyz_lut_t> sensor_depth_camera_xyz_lut_;
+  std::mutex             mutex_sensor_depth_camera_xyz_lut_;
+
+  std::vector<SensorParams2DLidar_t> sensor_params_2d_lidar_;
+  std::mutex                         mutex_sensor_params_2d_lidar_;
+
+  std::vector<SensorParams3DLidar_t> sensor_params_3d_lidar_;
+  std::mutex                         mutex_sensor_params_3d_lidar_;
+
   std::vector<SensorParamsDepthCam_t> sensor_params_depth_cam_;
+  std::mutex                          mutex_sensor_params_depth_cam_;
 
   // sensor model
   double _probHit_;
@@ -432,13 +442,19 @@ void OctomapServer::onInit() {
   /* initialize sensor LUT model //{ */
 
   for (int i = 0; i < n_sensors_3d_lidar_; i++) {
-    sensor_3d_lidar_xyz_lut_.push_back(xyz_lut_t());
+
+    xyz_lut_t lut_table;
+
+    sensor_3d_lidar_xyz_lut_.push_back(lut_table);
 
     initialize3DLidarLUT(sensor_3d_lidar_xyz_lut_[i], sensor_params_3d_lidar_[i]);
   }
 
   for (int i = 0; i < n_sensors_depth_cam_; i++) {
-    sensor_depth_camera_xyz_lut_.push_back(xyz_lut_t());
+
+    xyz_lut_t lut_table;
+
+    sensor_depth_camera_xyz_lut_.push_back(lut_table);
 
     initializeDepthCamLUT(sensor_depth_camera_xyz_lut_[i], sensor_params_depth_cam_[i]);
   }
@@ -513,19 +529,19 @@ void OctomapServer::onInit() {
   for (int i = 0; i < n_sensors_3d_lidar_; i++) {
 
     std::stringstream ss;
-    ss << "3d_lidar_" << i << "_in";
+    ss << "lidar_3d_" << i << "_in";
 
-    sh_3dlaser_pc2_.push_back(
-        mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>(shopts, ss.str(), boost::bind(&OctomapServer::callback3dLidarCloud2, this, _1, LIDAR_3D, i)));
+    sh_3dlaser_pc2_.push_back(mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>(
+        shopts, ss.str(), std::bind(&OctomapServer::callback3dLidarCloud2, this, std::placeholders::_1, LIDAR_3D, i)));
   }
 
-  for (int i = 0; i < n_sensors_2d_lidar_; i++) {
+  for (int i = 0; i < n_sensors_depth_cam_; i++) {
 
     std::stringstream ss;
-    ss << "3d_lidar_" << i << "_in";
+    ss << "depth_camera_" << i << "_in";
 
-    sh_depth_cam_pc2_.push_back(
-        mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>(shopts, ss.str(), boost::bind(&OctomapServer::callback3dLidarCloud2, this, _1, DEPTH_CAMERA, i)));
+    sh_depth_cam_pc2_.push_back(mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>(
+        shopts, ss.str(), std::bind(&OctomapServer::callback3dLidarCloud2, this, std::placeholders::_1, DEPTH_CAMERA, i)));
   }
 
   /* sh_laser_scan_ = mrs_lib::SubscribeHandler<sensor_msgs::LaserScan>(shopts, "laser_scan_in", &OctomapServer::callbackLaserScan, this); */
@@ -670,8 +686,6 @@ void OctomapServer::callbackLaserScan(mrs_lib::SubscribeHandler<sensor_msgs::Las
 
 void OctomapServer::callback3dLidarCloud2(mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>& wrp, const SensorType_t sensor_type, const int sensor_id) {
 
-  ROS_INFO_THROTTLE(1.0, "[OctomapServer]: got cloud on %d", sensor_id);
-
   if (!is_initialized_) {
     return;
   }
@@ -711,6 +725,7 @@ void OctomapServer::callback3dLidarCloud2(mrs_lib::SubscribeHandler<sensor_msgs:
   PCLPointCloud::Ptr pc              = boost::make_shared<PCLPointCloud>();
   PCLPointCloud::Ptr free_vectors_pc = boost::make_shared<PCLPointCloud>();
   PCLPointCloud::Ptr hit_pc          = boost::make_shared<PCLPointCloud>();
+
   pcl::fromROSMsg(*cloud, *pc);
 
   auto res = transformer_.getTransform(cloud->header.frame_id, _world_frame_, cloud->header.stamp);
@@ -724,31 +739,48 @@ void OctomapServer::callback3dLidarCloud2(mrs_lib::SubscribeHandler<sensor_msgs:
   geometry_msgs::TransformStamped sensorToWorldTf = res.value().getTransform();
   pcl_ros::transformAsMatrix(sensorToWorldTf.transform, sensorToWorld);
 
-  // compute free rays, if required
-  if (_unknown_rays_update_free_space_) {
+  double max_range;
 
-    /* Eigen::Affine3d s2w = tf2::transformToEigen(sensorToWorldTf); */
+  switch (sensor_type) {
 
-    /* const auto tf_rot = s2w.rotation(); */
-    /* // origin of all rays of the lidar sensor */
-    /* const vec3_t origin_pt = s2w.translation(); */
+    case LIDAR_3D: {
 
-    // go through all points in the cloud and update voxels in the helper voxelmap that the rays
-    // from the sensor origin to the point go through according to how long part of the ray
-    // intersects the voxel
-    for (int i = 0; i < pc->size(); i++) {
+      std::scoped_lock lock(mutex_sensor_params_3d_lidar_);
 
-      pcl::PointXYZ pt = pc->at(i);
+      max_range = sensor_params_3d_lidar_[sensor_id].max_range;
 
-      const double max_range = sensor_params_3d_lidar_[sensor_id].max_range;
+      break;
+    }
 
-      if (!std::isfinite(pt.x) || !std::isfinite(pt.y) || !std::isfinite(pt.z) || fabs(pt.x) > max_range || fabs(pt.y) > max_range || fabs(pt.z) > max_range) {
+    case DEPTH_CAMERA: {
+
+      std::scoped_lock lock(mutex_sensor_params_depth_cam_);
+
+      max_range = sensor_params_depth_cam_[sensor_id].max_range;
+
+      break;
+    }
+  }
+
+  for (int i = 0; i < pc->size(); i++) {
+
+    pcl::PointXYZ pt = pc->at(i);
+
+    if ((std::isfinite(pt.x) && std::isfinite(pt.y) && std::isfinite(pt.z)) && ((pow(pt.x, 2) + pow(pt.y, 2) + pow(pt.z, 2)) < pow(max_range, 2))) {
+
+      hit_pc->push_back(pt);
+
+    } else {
+
+      if (_unknown_rays_update_free_space_) {
 
         vec3_t ray_vec;
 
         switch (sensor_type) {
 
           case LIDAR_3D: {
+
+            std::scoped_lock lock(mutex_sensor_3d_lidar_xyz_lut_);
 
             ray_vec = sensor_3d_lidar_xyz_lut_[sensor_id].directions.col(i);
 
@@ -757,6 +789,8 @@ void OctomapServer::callback3dLidarCloud2(mrs_lib::SubscribeHandler<sensor_msgs:
 
           case DEPTH_CAMERA: {
 
+            std::scoped_lock lock(mutex_sensor_depth_camera_xyz_lut_);
+
             ray_vec = sensor_depth_camera_xyz_lut_[sensor_id].directions.col(i);
 
             break;
@@ -764,14 +798,15 @@ void OctomapServer::callback3dLidarCloud2(mrs_lib::SubscribeHandler<sensor_msgs:
         }
 
         if (ray_vec(2) > 0.0) {
-          pt.x = ray_vec(0) * float(_unknown_rays_distance_);
-          pt.y = ray_vec(1) * float(_unknown_rays_distance_);
-          pt.z = ray_vec(2) * float(_unknown_rays_distance_);
 
-          free_vectors_pc->push_back(pt);
+          pcl::PointXYZ temp_pt;
+
+          temp_pt.x = ray_vec(0) * float(max_range);
+          temp_pt.y = ray_vec(1) * float(max_range);
+          temp_pt.z = ray_vec(2) * float(max_range);
+
+          free_vectors_pc->push_back(temp_pt);
         }
-      } else {
-        hit_pc->push_back(pt);
       }
     }
   }
@@ -779,28 +814,47 @@ void OctomapServer::callback3dLidarCloud2(mrs_lib::SubscribeHandler<sensor_msgs:
   free_vectors_pc->header = pc->header;
 
   // Voxelize data
-  if (!hit_pc->empty()) {
-    pcl::VoxelGrid<PCLPoint> vg;
-    vg.setInputCloud(hit_pc);
-    vg.setLeafSize(0.2, 0.2, 0.2);
-    vg.filter(*hit_pc);
-  }
+  /* if (hit_pc->size() > 0) { */
 
-  if (!free_vectors_pc->empty()) {
-    pcl::VoxelGrid<PCLPoint> vg;
-    vg.setInputCloud(free_vectors_pc);
-    vg.setLeafSize(1.0, 1.0, 1.0);
-    vg.filter(*free_vectors_pc);
-  }
+  /*   ROS_INFO("[OctomapServer]: size %d", hit_pc->size()); */
 
-  // filter lone pixels
-  if (!hit_pc->empty()) {
-    pcl::StatisticalOutlierRemoval<PCLPoint> sor(true);
-    sor.setInputCloud(hit_pc);
-    sor.setMeanK(50.0);
-    sor.setStddevMulThresh(1.0);
-    sor.filter(*hit_pc);
-  }
+  /*   for (int i = 0; i < hit_pc->size(); i++) { */
+
+  /*     const pcl::PointXYZ pt = hit_pc->at(i); */
+  /*     const double        x  = pt.x; */
+  /*     const double        y  = pt.y; */
+  /*     const double        z  = pt.z; */
+
+  /*     if (!std::isfinite(x)) { */
+  /*       ROS_ERROR("NaN detected in variable \"x\"!!!"); */
+  /*     } */
+  /*   } */
+
+  /*   pcl::VoxelGrid<PCLPoint> vg; */
+  /*   vg.setInputCloud(hit_pc); */
+  /*   vg.setLeafSize(0.2, 0.2, 0.2); */
+  /*   PCLPointCloud::Ptr temp_pc; */
+  /*   ROS_INFO("[OctomapServer]: voxel grid in"); */
+  /*   vg.filter(*hit_pc); */
+  /*   ROS_INFO("[OctomapServer]: voxel grid out"); */
+  /* } */
+
+  /* if (free_vectors_pc->size() > 0) { */
+  /*   pcl::VoxelGrid<PCLPoint> vg; */
+  /*   vg.setInputCloud(free_vectors_pc); */
+  /*   vg.setLeafSize(1.0, 1.0, 1.0); */
+  /*   vg.filter(*free_vectors_pc); */
+  /* } */
+
+  /* // filter lone pixels */
+  /* if (hit_pc->size() > 0) { */
+  /*   pcl::StatisticalOutlierRemoval<PCLPoint> sor(true); */
+  /*   sor.setInputCloud(hit_pc); */
+  /*   sor.setMeanK(50.0); */
+  /*   sor.setStddevMulThresh(1.0); */
+  /*   sor.filter(*hit_pc); */
+  /* } */
+
   // transform to the map frame
 
   pcl::transformPointCloud(*hit_pc, *hit_pc, sensorToWorld);
@@ -825,7 +879,7 @@ void OctomapServer::callback3dLidarCloud2(mrs_lib::SubscribeHandler<sensor_msgs:
 
     ROS_INFO_THROTTLE(1.0, "[OctomapServer]: avg cloud insertion time = %.3f sec", avg_time_cloud_insertion_);
   }
-}
+}  // namespace mrs_octomap_server
 
 //}
 
@@ -1511,6 +1565,9 @@ void OctomapServer::initializeDepthCamLUT(xyz_lut_t& lut, const SensorParamsDept
   const int horizontalRangeCount = sensor_params.horizontal_rays;
   const int verticalRangeCount   = sensor_params.vertical_rays;
 
+  ROS_INFO("[OctomapServer]: initializing depth camera lut, res %d x %d = %d points", horizontalRangeCount, verticalRangeCount,
+           horizontalRangeCount * verticalRangeCount);
+
   std::vector<std::tuple<double, double, double>> coord_coeffs;
 
   // yes it's flipped, pixel [0,0] is top-left
@@ -1529,10 +1586,11 @@ void OctomapServer::initializeDepthCamLUT(xyz_lut_t& lut, const SensorParamsDept
   double yAngle_step = yDiff / (horizontalRangeCount - 1);
 
   double pAngle_step;
-  if (verticalRangeCount > 1)
+  if (verticalRangeCount > 1) {
     pAngle_step = pDiff / (verticalRangeCount - 1);
-  else
+  } else {
     pAngle_step = 0;
+  }
 
   coord_coeffs.reserve(horizontalRangeCount * verticalRangeCount);
 
@@ -1564,7 +1622,7 @@ void OctomapServer::initializeDepthCamLUT(xyz_lut_t& lut, const SensorParamsDept
 
   for (int row = 0; row < verticalRangeCount; row++) {
     for (int col = 0; col < horizontalRangeCount; col++) {
-      const auto [x_coeff, y_coeff, z_coeff] = coord_coeffs.at(col * verticalRangeCount + row);
+      const auto [x_coeff, y_coeff, z_coeff] = coord_coeffs.at(col + horizontalRangeCount * row);
       lut.directions.col(it)                 = vec3_t(x_coeff, y_coeff, z_coeff);
       lut.offsets.col(it)                    = vec3_t(0, 0, 0);
       it++;
