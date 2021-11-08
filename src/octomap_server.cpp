@@ -244,8 +244,6 @@ private:
 
   laser_geometry::LaserProjection projector_;
 
-  bool copyInsideBBX(std::shared_ptr<OcTree_t>& from, std::shared_ptr<OcTree_t>& to, const octomap::point3d& p_min, const octomap::point3d& p_max);
-
   bool copyInsideBBX2(std::shared_ptr<OcTree_t>& from, std::shared_ptr<OcTree_t>& to, const octomap::point3d& p_min, const octomap::point3d& p_max);
 
   octomap::OcTreeNode* touchNodeRecurs(std::shared_ptr<OcTree_t>& octree, octomap::OcTreeNode* node, const octomap::OcTreeKey& key, unsigned int depth,
@@ -261,16 +259,6 @@ private:
 
   bool createLocalMap(const std::string frame_id, const double horizontal_distance, const double vertical_distance, std::shared_ptr<OcTree_t>& octree);
 
-  inline static void updateMinKey(const octomap::OcTreeKey& in, octomap::OcTreeKey& min) {
-    for (unsigned i = 0; i < 3; ++i)
-      min[i] = std::min(in[i], min[i]);
-  };
-
-  inline static void updateMaxKey(const octomap::OcTreeKey& in, octomap::OcTreeKey& max) {
-    for (unsigned i = 0; i < 3; ++i)
-      max[i] = std::max(in[i], max[i]);
-  };
-
   virtual void insertPointCloud(const geometry_msgs::Vector3& sensorOrigin, const PCLPointCloud::ConstPtr& cloud, const PCLPointCloud::ConstPtr& free_cloud);
 
   void initialize3DLidarLUT(xyz_lut_t& lut, const SensorParams3DLidar_t sensor_params);
@@ -281,22 +269,16 @@ private:
   int n_sensors_depth_cam_;
 
   std::vector<xyz_lut_t> sensor_2d_lidar_xyz_lut_;
-  std::mutex             mutex_sensor_2d_lidar_xyz_lut_;
 
   std::vector<xyz_lut_t> sensor_3d_lidar_xyz_lut_;
-  std::mutex             mutex_sensor_3d_lidar_xyz_lut_;
 
   std::vector<xyz_lut_t> sensor_depth_camera_xyz_lut_;
-  std::mutex             mutex_sensor_depth_camera_xyz_lut_;
 
   std::vector<SensorParams2DLidar_t> sensor_params_2d_lidar_;
-  std::mutex                         mutex_sensor_params_2d_lidar_;
 
   std::vector<SensorParams3DLidar_t> sensor_params_3d_lidar_;
-  std::mutex                         mutex_sensor_params_3d_lidar_;
 
   std::vector<SensorParamsDepthCam_t> sensor_params_depth_cam_;
-  std::mutex                          mutex_sensor_params_depth_cam_;
 
   // sensor model
   double _probHit_;
@@ -745,16 +727,12 @@ void OctomapServer::callback3dLidarCloud2(mrs_lib::SubscribeHandler<sensor_msgs:
 
     case LIDAR_3D: {
 
-      std::scoped_lock lock(mutex_sensor_params_3d_lidar_);
-
       max_range = sensor_params_3d_lidar_[sensor_id].max_range;
 
       break;
     }
 
     case DEPTH_CAMERA: {
-
-      std::scoped_lock lock(mutex_sensor_params_depth_cam_);
 
       max_range = sensor_params_depth_cam_[sensor_id].max_range;
 
@@ -780,16 +758,12 @@ void OctomapServer::callback3dLidarCloud2(mrs_lib::SubscribeHandler<sensor_msgs:
 
           case LIDAR_3D: {
 
-            std::scoped_lock lock(mutex_sensor_3d_lidar_xyz_lut_);
-
             ray_vec = sensor_3d_lidar_xyz_lut_[sensor_id].directions.col(i);
 
             break;
           }
 
           case DEPTH_CAMERA: {
-
-            std::scoped_lock lock(mutex_sensor_depth_camera_xyz_lut_);
 
             ray_vec = sensor_depth_camera_xyz_lut_[sensor_id].directions.col(i);
 
@@ -1706,37 +1680,6 @@ bool OctomapServer::saveToFile(const std::string& filename) {
   catch (std::filesystem::filesystem_error& e) {
     ROS_ERROR("[OctomapServer]: failed to copy map to the backup path");
   }
-
-  return true;
-}
-
-//}
-
-/* copyInsideBBX() //{ */
-
-bool OctomapServer::copyInsideBBX(std::shared_ptr<OcTree_t>& from, std::shared_ptr<OcTree_t>& to, const octomap::point3d& p_min,
-                                  const octomap::point3d& p_max) {
-
-  octomap::OcTreeKey minKey, maxKey;
-
-  if (!from->coordToKeyChecked(p_min, minKey) || !from->coordToKeyChecked(p_max, maxKey)) {
-    return false;
-  }
-
-  for (OcTree_t::leaf_bbx_iterator it = from->begin_leafs_bbx(p_min, p_max), end = from->end_leafs_bbx(); it != end; ++it) {
-
-    octomap::OcTreeKey   k    = it.getKey();
-    octomap::OcTreeNode* node = from->search(k);
-
-    expandNodeRecursive(from, node, it.getDepth());
-  }
-
-  for (OcTree_t::leaf_bbx_iterator it = from->begin_leafs_bbx(p_min, p_max), end = from->end_leafs_bbx(); it != end; ++it) {
-
-    to->setNodeValue(it.getKey(), it->getValue());
-  }
-
-  to->prune();
 
   return true;
 }
