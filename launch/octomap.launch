@@ -36,6 +36,8 @@
   <arg if="$(eval arg('RUN_TYPE') == 'simulation')" name="simulation" default="true" />
   <arg unless="$(eval arg('RUN_TYPE') == 'simulation')" name="simulation" default="false" />
 
+  <!-- <env name="LD_PRELOAD" value="/usr/lib/x86_64-linux-gnu/libasan.so.5"/> -->
+
   <group ns="$(arg UAV_NAME)">
 
     <node pkg="nodelet" type="nodelet" name="octomap_server" args="$(arg nodelet) mrs_octomap_server/MrsOctomapServer $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)">

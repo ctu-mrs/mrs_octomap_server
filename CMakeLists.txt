@@ -37,16 +37,18 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_compile_options("-fPIC")
-add_compile_options("${PCL_COMPILE_OPTIONS}")
+# set(CMAKE_XCODE_GENERATE_SCHEME ON)
+# set(CMAKE_XCODE_SCHEME_ADDRESS_SANITIZER ON)
+# set(CMAKE_XCODE_SCHEME_ADDRESS_SANITIZER_USE_AFTER_RETURN ON)
 
-message("PCL Compile options: '${PCL_COMPILE_OPTIONS}', pes")
-message("CXX flags: '${CMAKE_CXX_FLAGS}', pes")
+add_compile_options("-fsanitize=address")
+add_link_options("-fsanitize=address")
+
+add_compile_options("${PCL_COMPILE_OPTIONS}")
 
 find_package(OpenMP REQUIRED)
 
 find_package(octomap REQUIRED)
-add_definitions(-DOCTOMAP_NODEBUGOUT)
 
 # include Eigen3
 find_package(Eigen3 REQUIRED)
@@ -64,19 +66,20 @@ include_directories(
   include
   ${catkin_INCLUDE_DIRS}
   ${Eigen_INCLUDE_DIRS}
-  ${PCL_INCLUDE_DIRS}
   ${OCTOMAP_INCLUDE_DIRS}
+  ${PCL_INCLUDE_DIRS}
   )
 
 ## Add link directories
 link_directories(
-  ${PCL_LIBRARY_DIRS}
+  # ${PCL_LIBRARY_DIRS}
+  ${PCL_LIBRARIES}
 )
 
 # This causes adds the -march=native gcc flag that prevents ditributed compilation
-add_definitions(
-  ${PCL_DEFINITIONS}
-  )
+# add_definitions(
+#   ${PCL_DEFINITIONS}
+#   )
 
 # MrsOctomapServer
 
@@ -90,6 +93,8 @@ add_dependencies(MrsOctomapServer
   ${catkin_EXPORTED_TARGETS}
   )
 
+target_include_directories(MrsOctomapServer PUBLIC ${PCL_INCLUDE_DIRS})
+
 target_link_libraries(MrsOctomapServer
   ${catkin_LIBRARIES}
   ${PCL_LIBRARIES}
@@ -97,3 +102,7 @@ target_link_libraries(MrsOctomapServer
   )
 
 target_include_directories(MrsOctomapServer SYSTEM PRIVATE ${PCL_INCLUDE_DIRS})
+
+target_compile_definitions(MrsOctomapServer PUBLIC ${PCL_DEFINITIONS})
+
+target_compile_options(MrsOctomapServer PUBLIC ${PCL_COMPILE_OPTIONS})
