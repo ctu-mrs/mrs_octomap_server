@@ -1508,13 +1508,13 @@ void OctomapServer::initialize3DLidarLUT(xyz_lut_t& lut, const SensorParams3DLid
   const int                                       rangeCount         = sensor_params.horizontal_rays;
   const int                                       verticalRangeCount = sensor_params.vertical_rays;
   std::vector<std::tuple<double, double, double>> coord_coeffs;
-  const double                                    horizontalMinAngle = 0.0;
-  const double                                    horizontalMaxAngle = 360;
+  const double                                    minAngle = 0.0;
+  const double                                    maxAngle = 2.0 * M_PI;
 
   const double verticalMinAngle = -sensor_params.vertical_fov / 2.0;
   const double verticalMaxAngle = sensor_params.vertical_fov / 2.0;
 
-  const double yDiff = horizontalMaxAngle - horizontalMinAngle;
+  const double yDiff = maxAngle - minAngle;
   const double pDiff = verticalMaxAngle - verticalMinAngle;
 
   double yAngle_step = yDiff / (rangeCount - 1);
@@ -1531,7 +1531,7 @@ void OctomapServer::initialize3DLidarLUT(xyz_lut_t& lut, const SensorParams3DLid
     for (int j = 0; j < verticalRangeCount; j++) {
 
       // Get angles of ray to get xyz for point
-      const double yAngle = i * yAngle_step + horizontalMinAngle;
+      const double yAngle = i * yAngle_step + minAngle;
       const double pAngle = j * pAngle_step + verticalMinAngle;
 
       const double x_coeff = cos(pAngle) * cos(yAngle);
@@ -1542,7 +1542,6 @@ void OctomapServer::initialize3DLidarLUT(xyz_lut_t& lut, const SensorParams3DLid
   }
 
   int it = 0;
-
   lut.directions.resize(3, rangeCount * verticalRangeCount);
   lut.offsets.resize(3, rangeCount * verticalRangeCount);
 
@@ -1554,7 +1553,7 @@ void OctomapServer::initialize3DLidarLUT(xyz_lut_t& lut, const SensorParams3DLid
       it++;
     }
   }
-}
+}  // namespace mrs_octomap_server
 
 //}
 

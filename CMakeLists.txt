@@ -41,8 +41,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # set(CMAKE_XCODE_SCHEME_ADDRESS_SANITIZER ON)
 # set(CMAKE_XCODE_SCHEME_ADDRESS_SANITIZER_USE_AFTER_RETURN ON)
 
-add_compile_options("-fsanitize=address")
-add_link_options("-fsanitize=address")
+# add_compile_options("-fsanitize=address")
+# add_link_options("-fsanitize=address")
 
 add_compile_options("${PCL_COMPILE_OPTIONS}")
 
