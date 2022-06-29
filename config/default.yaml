@@ -43,6 +43,7 @@ local_map:
 
   publish_full: false # should publish map with full probabilities?
   publish_binary: true # should publish map with binary occupancy?
+  publish_point_cloud: true
 
 global_map:
 
