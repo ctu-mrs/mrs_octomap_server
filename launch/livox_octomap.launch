@@ -1,0 +1,77 @@
+<launch>
+
+  <arg name="UAV_NAME" default="$(optenv UAV_NAME uav49)" />
+  <arg name="RUN_TYPE" default="$(optenv RUN_TYPE)" />
+
+  <arg name="debug" default="false" />
+  <arg name="standalone" default="true" />
+  <arg name="custom_config" default="$(find mrs_octomap_server)/config/livox.yaml" />
+
+  <arg name="lidar_3d_topic_0_in" default="/uav49/livox/lidar" />
+
+  <arg name="lidar_3d_topic_0_over_max_range_in" default="/uav49/livox/lidar" />
+
+  <arg name="map_path" default="$(env HOME)/maps" />
+
+  <arg name="world_frame_id" default="$(arg UAV_NAME)/fcu" />
+  <arg name="robot_frame_id" default="/aft_mapped" />
+
+  <arg     if="$(arg debug)" name="launch_prefix" value="debug_roslaunch" />
+  <arg unless="$(arg debug)" name="launch_prefix" value="" />
+
+  <arg name="nodelet_manager_name" default="" />
+  <arg     if="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="standalone" />
+  <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet" value="load" />
+  <arg     if="$(eval arg('standalone') or arg('debug'))" name="nodelet_manager" value="" />
+  <arg unless="$(eval arg('standalone') or arg('debug'))" name="nodelet_manager" value="$(arg nodelet_manager_name)" />
+
+  <arg if="$(eval arg('RUN_TYPE') == 'simulation')" name="simulation" default="true" />
+  <arg unless="$(eval arg('RUN_TYPE') == 'simulation')" name="simulation" default="false" />
+
+  <!-- <env name="LD_PRELOAD" value="/usr/lib/x86_64-linux-gnu/libasan.so.5"/> -->
+
+  <group ns="$(arg UAV_NAME)">
+
+    <node pkg="nodelet" type="nodelet" name="octomap_server" args="$(arg nodelet) mrs_octomap_server/MrsOctomapServer $(arg nodelet_manager)" output="screen" launch-prefix="$(arg launch_prefix)">
+
+      <rosparam file="$(find mrs_octomap_server)/config/default.yaml" />
+      <rosparam if="$(eval not arg('custom_config') == '')" file="$(arg custom_config)" />
+
+      <param name="uav_name" type="string" value="$(arg UAV_NAME)" />
+      <param name="simulation" type="bool" value="$(arg simulation)" />
+
+      <param name="world_frame_id" type="string" value="$(arg world_frame_id)" />
+      <param name="robot_frame_id" type="string" value="$(arg robot_frame_id)" />
+
+      <param name="map_path" type="string" value="$(arg map_path)" />
+
+      <!-- topics in -->
+
+      <!-- 3D lidar -->
+      <remap from="~lidar_3d_0_in" to="$(arg lidar_3d_topic_0_in)" />
+
+      <remap from="~lidar_3d_0_over_max_range_in" to="$(arg lidar_3d_topic_0_over_max_range_in)" />
+
+      <remap from="~control_manager_diagnostics_in" to="control_manager/diagnostics" />
+      <remap from="~height_in" to="odometry/height" />
+      <remap from="~clear_box_in" to="uav_pose_estimator/clear_box" />
+
+      <!-- topics out -->
+
+      <remap from="~octomap_global_full_out" to="~octomap_global_full" />
+      <remap from="~octomap_global_binary_out" to="~octomap_global_binary" />
+
+      <remap from="~octomap_local_full_out" to="~octomap_local_full" />
+      <remap from="~octomap_local_binary_out" to="~octomap_local_binary" />
+
+        <!-- services -->
+      <remap from="~reset_map_in" to="~reset_map" />
+      <remap from="~save_map_in" to="~save_map" />
+      <remap from="~load_map_in" to="~load_map" />
+      <remap from="~set_global_fractor_in" to="~set_global_fractor" />
+      <remap from="~set_local_fractor_in" to="~set_local_fractor" />
+
+    </node>
+
+  </group>
+</launch>

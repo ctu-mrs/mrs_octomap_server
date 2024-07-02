@@ -61,6 +61,8 @@
 
 #include <mrs_octomap_server/PoseWithSize.h>
 
+#include <livox_ros_driver2/CustomMsg.h>
+
 //}
 
 namespace mrs_octomap_server
@@ -148,6 +150,9 @@ public:
   void callback3dLidarCloud2(const sensor_msgs::PointCloud2::ConstPtr msg, const SensorType_t sensor_type, const int sensor_id, const std::string topic,
                              const bool pcl_over_max_range = false);
 
+  void callbackLivoxCloud( const livox_ros_driver2::CustomMsg::ConstPtr msg, const SensorType_t sensor_type, const int sensor_id, const std::string topic,
+                             const bool pcl_over_max_range = false );
+
   void callbackLaserScan(const sensor_msgs::LaserScan::ConstPtr msg);
   void callbackCameraInfo(const sensor_msgs::CameraInfo::ConstPtr msg, const int sensor_id);
   bool loadFromFile(const std::string& filename);
@@ -167,6 +172,7 @@ private:
   std::vector<mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>> sh_depth_cam_pc2_;
   std::vector<mrs_lib::SubscribeHandler<sensor_msgs::CameraInfo>>  sh_depth_cam_info_;
   std::vector<mrs_lib::SubscribeHandler<sensor_msgs::LaserScan>>   sh_laser_scan_;
+  std::vector<mrs_lib::SubscribeHandler<livox_ros_driver2::CustomMsg>> sh_Livox_pc2_;
 
   // | ----------------------- publishers ----------------------- |
 
@@ -205,6 +211,12 @@ private:
   void       timerAltitudeAlignment([[maybe_unused]] const ros::TimerEvent& event);
 
   // | ----------------------- parameters ----------------------- |
+
+  /*Livox parameters*/
+  bool _is_livox_;
+  int _n_scans_;
+  double _blind_;
+  int _point_filter_num_;
 
   bool        _simulation_;
   std::string _uav_name_;
@@ -387,6 +399,12 @@ void OctomapServer::onInit() {
   param_loader.loadParam("sensor_params/2d_lidar/n_sensors", n_sensors_2d_lidar_);
   param_loader.loadParam("sensor_params/3d_lidar/n_sensors", n_sensors_3d_lidar_);
   param_loader.loadParam("sensor_params/depth_camera/n_sensors", n_sensors_depth_cam_);
+  
+  /*Livox parameters load*/
+  param_loader.loadParam( "sensor_params/3d_lidar/livox/is_livox", _is_livox_);
+  param_loader.loadParam( "sensor_params/3d_lidar/livox/n_scans", _n_scans_ );
+  param_loader.loadParam( "sensor_params/3d_lidar/livox/blind", _blind_ );
+  param_loader.loadParam( "sensor_params/3d_lidar/livox/point_filter_num", _point_filter_num_ );
 
   for (int i = 0; i < n_sensors_2d_lidar_; i++) {
 
@@ -605,15 +623,28 @@ void OctomapServer::onInit() {
 
     std::stringstream ss;
     ss << "lidar_3d_" << i << "_in";
-
-    sh_3dlaser_pc2_.push_back(mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>(
-        shopts, ss.str(), ros::Duration(2.0), std::bind(&OctomapServer::callback3dLidarCloud2, this, std::placeholders::_1, LIDAR_3D, i, ss.str(), false)));
+    if( !_is_livox_ ) {
+      sh_3dlaser_pc2_.push_back(mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>(
+          shopts, ss.str(), ros::Duration(2.0), std::bind(&OctomapServer::callback3dLidarCloud2, this, std::placeholders::_1, LIDAR_3D, i, ss.str(), false)));
+    }
+    else {
+      sh_Livox_pc2_.push_back(mrs_lib::SubscribeHandler<livox_ros_driver2::CustomMsg>(
+          shopts, ss.str(), ros::Duration(2.0), std::bind(&OctomapServer::callbackLivoxCloud, this, std::placeholders::_1, LIDAR_3D, i, ss.str(), false)));
+    }
 
     std::stringstream ss2;
     ss2 << "lidar_3d_" << i << "_over_max_range_in";
 
-    sh_3dlaser_pc2_.push_back(mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>(
-        shopts, ss2.str(), ros::Duration(2.0), std::bind(&OctomapServer::callback3dLidarCloud2, this, std::placeholders::_1, LIDAR_3D, i, ss.str(), true)));
+    if( !_is_livox_ ) {
+      sh_3dlaser_pc2_.push_back(mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>(
+          shopts, ss2.str(), ros::Duration(2.0), std::bind(&OctomapServer::callback3dLidarCloud2, this, std::placeholders::_1, LIDAR_3D, i, ss.str(), true)));
+    }
+    else {
+      sh_Livox_pc2_.push_back(mrs_lib::SubscribeHandler<livox_ros_driver2::CustomMsg>(
+          shopts, ss2.str(), ros::Duration(2.0), std::bind(&OctomapServer::callbackLivoxCloud, this, std::placeholders::_1, LIDAR_3D, i, ss.str(), true)));
+    }
+
+
   }
 
   for (int i = 0; i < n_sensors_depth_cam_; i++) {
@@ -1081,6 +1112,198 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::PointCloud2::ConstP
 }  // namespace mrs_octomap_server
 
 //}
+/*Livox Callback*/
+void OctomapServer::callbackLivoxCloud( const livox_ros_driver2::CustomMsg::ConstPtr msg, const SensorType_t sensor_type, const int sensor_id, const std::string topic,
+                             const bool pcl_over_max_range ) 
+{
+  // ROS_ERROR("ENTRO QUI!!");
+  if (!is_initialized_) {
+    return;
+  }
+
+  if (!octrees_initialized_) {
+    return;
+  }
+
+  if (sensor_type == DEPTH_CAMERA && !vec_camera_info_processed_.at(sensor_id)) {
+    ROS_WARN_THROTTLE(1.0, "[OctomapServer]: Received data for depth camera %d but no camera info received yet.", sensor_id);
+    return;
+  }
+
+  if (!_map_while_grounded_) {
+    if (!sh_control_manager_diag_.hasMsg()) {
+      ROS_WARN_THROTTLE(1.0, "[OctomapServer]: missing control manager diagnostics, can not integrate data!");
+      return;
+
+    } else {
+      ros::Time last_time = sh_control_manager_diag_.lastMsgTime();
+
+      if ((ros::Time::now() - last_time).toSec() > 1.0) {
+        ROS_WARN_THROTTLE(1.0, "[OctomapServer]: control manager diagnostics too old, can not integrate data!");
+        return;
+      }
+
+      // TODO is this the best option?
+      if (!sh_control_manager_diag_.getMsg()->flying_normally) {
+        ROS_INFO_THROTTLE(1.0, "[OctomapServer]: not flying normally, therefore, not integrating data");
+        return;
+      }
+    }
+  }
+  // ROS_ERROR("ENTRO QUI 8!!");
+  livox_ros_driver2::CustomMsg::ConstPtr cloud = msg;
+  ros::Time time_start = ros::Time::now();
+
+  int plsize = msg->point_num;
+
+  PCLPointCloud  pl_full;
+  PCLPointCloud pl_surf;
+  pl_surf.reserve(plsize);
+  pl_full.resize(plsize);
+
+  uint valid_num = 0; 
+
+  for(uint i=1; i<plsize; i++)
+  {
+    // ROS_ERROR("ENTRO QUI 9!!");
+    if((msg->points[i].line < _n_scans_) && ((msg->points[i].tag & 0x30) == 0x10 || (msg->points[i].tag & 0x30) == 0x00))
+    {
+      // ROS_ERROR("HERE 10!!");
+      // valid_num ++;
+      // if (valid_num % _point_filter_num_ == 0)
+      // {
+        pl_full[i].x = msg->points[i].x;
+        // ROS_ERROR("HERE 11!!");
+        pl_full[i].y = msg->points[i].y;
+        // ROS_ERROR("HERE 12!!");
+        pl_full[i].z = msg->points[i].z;
+        // ROS_ERROR("HERE 13!!");
+        /*Condition to get points not too close to each other*/
+        // if(((abs(pl_full[i].x - pl_full[i-1].x) > 1e-7) 
+        //     || (abs(pl_full[i].y - pl_full[i-1].y) > 1e-7)
+        //     || (abs(pl_full[i].z - pl_full[i-1].z) > 1e-7))
+        //     && (pl_full[i].x * pl_full[i].x + pl_full[i].y * pl_full[i].y + pl_full[i].z * pl_full[i].z > (_blind_ * _blind_)))
+        // {
+          pl_surf.push_back(pl_full[i]);
+          // ROS_ERROR("HERE 14!!");
+        // }
+      // }
+    }
+  }
+
+  PCLPointCloud::Ptr pc              = boost::make_shared<PCLPointCloud>(pl_surf);
+  PCLPointCloud::Ptr free_vectors_pc = boost::make_shared<PCLPointCloud>();
+  PCLPointCloud::Ptr hit_pc          = boost::make_shared<PCLPointCloud>();
+
+  auto res = transformer_->getTransform("camera_init", _world_frame_, cloud->header.stamp);
+
+  if (!res) {
+    ROS_ERROR("HERE!!");
+    ROS_WARN_THROTTLE(1.0, "[OctomapServer]: callback3dLidarCloud2(): could not find tf from %s to %s", cloud->header.frame_id.c_str(), _world_frame_.c_str());
+    return;
+  }
+
+  Eigen::Matrix4f                 sensorToWorld;
+  geometry_msgs::TransformStamped sensorToWorldTf = res.value();
+  pcl_ros::transformAsMatrix(sensorToWorldTf.transform, sensorToWorld);
+
+  double max_range;
+
+  // if (!pcl_over_max_range) {
+
+  //   // generate sensor lookup table for free space raycasting based on pointcloud dimensions
+  //   if (cloud->height == 1 || cloud->width == 1) {
+  //     ROS_WARN_THROTTLE(2.0, "Incoming pointcloud from %s #%d on topic %s is unorganized! Free space raycasting of unknows rays won't work properly!",
+  //                       _sensor_names_[sensor_type].c_str(), sensor_id, topic.c_str());
+  //   }
+  //   std::scoped_lock lock(mutex_lut_);
+
+  //   // change number of rays if it differs from the pointcloud dimensions
+  //   if (sensor_params_3d_lidar_[sensor_id].horizontal_rays != cloud->width || sensor_params_3d_lidar_[sensor_id].vertical_rays != cloud->height) {
+  //     sensor_params_3d_lidar_[sensor_id].horizontal_rays = cloud->width;
+  //     sensor_params_3d_lidar_[sensor_id].vertical_rays   = cloud->height;
+  //     ROS_INFO("[OctomapServer]: Changing sensor params for lidar %d to %d horizontal rays, %d vertical rays.", sensor_id,
+  //               sensor_params_3d_lidar_[sensor_id].horizontal_rays, sensor_params_3d_lidar_[sensor_id].vertical_rays);
+  //     initialize3DLidarLUT(sensor_3d_lidar_xyz_lut_[sensor_id], sensor_params_3d_lidar_[sensor_id]);
+  //   }
+
+  //   max_range = sensor_params_3d_lidar_[sensor_id].max_range;
+  // }
+  max_range = sensor_params_3d_lidar_[sensor_id].max_range;
+  // get raycasting parameters
+  double free_ray_distance      = 0;
+  bool   unknown_clear_occupied = false;
+  std::scoped_lock lock(mutex_lut_);
+  free_ray_distance      = sensor_params_3d_lidar_[sensor_id].free_ray_distance;
+  unknown_clear_occupied = sensor_params_3d_lidar_[sensor_id].clear_occupied;
+
+  if (pcl_over_max_range) {
+
+    free_vectors_pc->swap(*pc);
+
+  } else {
+
+    // go through the pointcloud
+    for (int i = 0; i < pc->size(); i++) {
+
+      pcl::PointXYZ pt = pc->at(i);
+
+      if ((!std::isfinite(pt.x) || !std::isfinite(pt.y) || !std::isfinite(pt.z))) {
+        // datapoint is missing, update only free space, if desired
+        vec3_t ray_vec;
+        double raycasting_distance       = 0;
+        bool   unknown_update_free_space = false;
+
+        std::scoped_lock lock(mutex_lut_);
+        ray_vec                   = sensor_3d_lidar_xyz_lut_[sensor_id].directions.col(i);
+        raycasting_distance       = sensor_params_3d_lidar_[sensor_id].free_ray_distance_unknown;
+        unknown_update_free_space = sensor_params_3d_lidar_[sensor_id].update_free_space;
+
+        if (unknown_update_free_space) {
+          pcl::PointXYZ temp_pt;
+
+          temp_pt.x = ray_vec(0) * float(raycasting_distance);
+          temp_pt.y = ray_vec(1) * float(raycasting_distance);
+          temp_pt.z = ray_vec(2) * float(raycasting_distance);
+
+          free_vectors_pc->push_back(temp_pt);
+        }
+      } else if ((pow(pt.x, 2) + pow(pt.y, 2) + pow(pt.z, 2)) > pow(max_range, 2)) {
+        // point is over the max range, update only free space
+        free_vectors_pc->push_back(pt);
+      } else {
+        // point is ok
+        hit_pc->push_back(pt);
+      }
+    }
+  }
+  free_vectors_pc->header = pc->header;
+
+  // transform to the map frame
+
+  pcl::transformPointCloud(*hit_pc, *hit_pc, sensorToWorld);
+  pcl::transformPointCloud(*free_vectors_pc, *free_vectors_pc, sensorToWorld);
+
+  hit_pc->header.frame_id          = _world_frame_;
+  free_vectors_pc->header.frame_id = _world_frame_;
+
+  insertPointCloud(sensorToWorldTf.transform.translation, hit_pc, free_vectors_pc, free_ray_distance, unknown_clear_occupied);
+
+  const octomap::point3d sensor_origin = octomap::pointTfToOctomap(sensorToWorldTf.transform.translation);
+
+  {
+    std::scoped_lock lock(mutex_avg_time_cloud_insertion_);
+
+    ros::Time time_end = ros::Time::now();
+
+    double exec_duration = (time_end - time_start).toSec();
+
+    double coef               = 0.5;
+    avg_time_cloud_insertion_ = coef * avg_time_cloud_insertion_ + (1.0 - coef) * exec_duration;
+
+    ROS_INFO_THROTTLE(1.0, "[OctomapServer]: avg cloud insertion time = %.3f sec", avg_time_cloud_insertion_);
+  }
+}
 
 // | -------------------- service callbacks ------------------- |
 
