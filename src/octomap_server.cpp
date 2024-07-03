@@ -1116,7 +1116,6 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::PointCloud2::ConstP
 void OctomapServer::callbackLivoxCloud( const livox_ros_driver2::CustomMsg::ConstPtr msg, const SensorType_t sensor_type, const int sensor_id, const std::string topic,
                              const bool pcl_over_max_range ) 
 {
-  // ROS_ERROR("ENTRO QUI!!");
   if (!is_initialized_) {
     return;
   }
@@ -1150,7 +1149,6 @@ void OctomapServer::callbackLivoxCloud( const livox_ros_driver2::CustomMsg::Cons
       }
     }
   }
-  // ROS_ERROR("ENTRO QUI 8!!");
   livox_ros_driver2::CustomMsg::ConstPtr cloud = msg;
   ros::Time time_start = ros::Time::now();
 
@@ -1165,13 +1163,11 @@ void OctomapServer::callbackLivoxCloud( const livox_ros_driver2::CustomMsg::Cons
 
   for(uint i=1; i<plsize; i++)
   {
-    // ROS_ERROR("ENTRO QUI 9!!");
     if((msg->points[i].line < _n_scans_) && ((msg->points[i].tag & 0x30) == 0x10 || (msg->points[i].tag & 0x30) == 0x00))
     {
-      // ROS_ERROR("HERE 10!!");
-      // valid_num ++;
-      // if (valid_num % _point_filter_num_ == 0)
-      // {
+      valid_num ++;
+      if (valid_num % _point_filter_num_ == 0)
+      {
         pl_full[i].x = msg->points[i].x;
         pl_full[i].y = msg->points[i].y;
         pl_full[i].z = msg->points[i].z;
@@ -1183,7 +1179,7 @@ void OctomapServer::callbackLivoxCloud( const livox_ros_driver2::CustomMsg::Cons
         {
           pl_surf.push_back(pl_full[i]);
         }
-      // }
+      }
     }
   }
 
@@ -1194,7 +1190,6 @@ void OctomapServer::callbackLivoxCloud( const livox_ros_driver2::CustomMsg::Cons
   auto res = transformer_->getTransform(cloud->header.frame_id, _world_frame_, cloud->header.stamp);
 
   if (!res) {
-    ROS_ERROR("ENTER QUI!!");
     ROS_WARN_THROTTLE(1.0, "[OctomapServer]: callback3dLidarCloud2(): could not find tf from %s to %s", cloud->header.frame_id.c_str(), _world_frame_.c_str());
     return;
   }

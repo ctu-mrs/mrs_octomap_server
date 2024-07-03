@@ -1,8 +1,10 @@
 # MRS OctoMap Server
 
-> :warning: **Attention please: This README is outdated.**
->
-> The MRS UAV System 1.5 is being released and this page needs updating. Please, keep in mind that the information on this page might not be valid.
+## Updates of this branch
+1. Added call back function for the custom livox message: ``` callbackLivoxCloud ```.
+2. Added Livox parameters (to be tuned).
+3. To use the livox point cloud call back set the parameter ``` sensor_params/3d_lidar/livox/is_livox := true ```.
+4. Some strange boxes appear around the drone during the take-off.
 
 ## Dependencies
 
