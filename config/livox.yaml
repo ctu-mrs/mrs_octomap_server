@@ -29,9 +29,9 @@ local_map:
 
   # the bounding box distance of the local map
   size:
-    max_width: 30 # [m] max width of the local map
+    max_width: 50 # [m] max width of the local map
     max_height: 15 # [m] max height of the local map
-    min_width: 20 # [m] min width of the local map
+    min_width: 30 # [m] min width of the local map
     min_height: 10 # [m] min height of the local map
     duty_high_threshold: 0.9 # [s] if inserting scan takes more time than this, decrease local map size
     duty_low_threshold: 0.8 # [s] if inserting scan takes less time than this, increase local map size
@@ -74,7 +74,7 @@ sensor_params:
     livox: 
       is_livox: true
       n_scans: 6
-      blind: 0.5
+      blind: 0.7
       point_filter_num: 1
 
     sensor_0:

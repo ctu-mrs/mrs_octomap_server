@@ -1173,20 +1173,16 @@ void OctomapServer::callbackLivoxCloud( const livox_ros_driver2::CustomMsg::Cons
       // if (valid_num % _point_filter_num_ == 0)
       // {
         pl_full[i].x = msg->points[i].x;
-        // ROS_ERROR("HERE 11!!");
         pl_full[i].y = msg->points[i].y;
-        // ROS_ERROR("HERE 12!!");
         pl_full[i].z = msg->points[i].z;
-        // ROS_ERROR("HERE 13!!");
         /*Condition to get points not too close to each other*/
-        // if(((abs(pl_full[i].x - pl_full[i-1].x) > 1e-7) 
-        //     || (abs(pl_full[i].y - pl_full[i-1].y) > 1e-7)
-        //     || (abs(pl_full[i].z - pl_full[i-1].z) > 1e-7))
-        //     && (pl_full[i].x * pl_full[i].x + pl_full[i].y * pl_full[i].y + pl_full[i].z * pl_full[i].z > (_blind_ * _blind_)))
-        // {
+        if(((abs(pl_full[i].x - pl_full[i-1].x) > 1e-7) 
+            || (abs(pl_full[i].y - pl_full[i-1].y) > 1e-7)
+            || (abs(pl_full[i].z - pl_full[i-1].z) > 1e-7))
+            && (pl_full[i].x * pl_full[i].x + pl_full[i].y * pl_full[i].y + pl_full[i].z * pl_full[i].z > (_blind_ * _blind_)))
+        {
           pl_surf.push_back(pl_full[i]);
-          // ROS_ERROR("HERE 14!!");
-        // }
+        }
       // }
     }
   }
@@ -1195,10 +1191,10 @@ void OctomapServer::callbackLivoxCloud( const livox_ros_driver2::CustomMsg::Cons
   PCLPointCloud::Ptr free_vectors_pc = boost::make_shared<PCLPointCloud>();
   PCLPointCloud::Ptr hit_pc          = boost::make_shared<PCLPointCloud>();
 
-  auto res = transformer_->getTransform("camera_init", _world_frame_, cloud->header.stamp);
+  auto res = transformer_->getTransform(cloud->header.frame_id, _world_frame_, cloud->header.stamp);
 
   if (!res) {
-    ROS_ERROR("HERE!!");
+    ROS_ERROR("ENTER QUI!!");
     ROS_WARN_THROTTLE(1.0, "[OctomapServer]: callback3dLidarCloud2(): could not find tf from %s to %s", cloud->header.frame_id.c_str(), _world_frame_.c_str());
     return;
   }

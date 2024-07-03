@@ -13,8 +13,8 @@
 
   <arg name="map_path" default="$(env HOME)/maps" />
 
-  <arg name="world_frame_id" default="$(arg UAV_NAME)/fcu" />
-  <arg name="robot_frame_id" default="/aft_mapped" />
+  <arg name="world_frame_id" default="$(arg UAV_NAME)/fixed_origin" />
+  <arg name="robot_frame_id" default="$(arg UAV_NAME)/fcu" />
 
   <arg     if="$(arg debug)" name="launch_prefix" value="debug_roslaunch" />
   <arg unless="$(arg debug)" name="launch_prefix" value="" />
