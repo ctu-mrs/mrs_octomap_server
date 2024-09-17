@@ -1306,8 +1306,10 @@ void OctomapServer::timerGlobalMapCreator([[maybe_unused]] const ros::TimerEvent
 
     std::scoped_lock lock(mutex_octree_global_);
 
-    octomap::point3d roi_min(res->pose.position.x - _global_map_size_/2.0, res->pose.position.y - _global_map_size_/2.0, res->pose.position.z - _global_map_size_/2.0);
-    octomap::point3d roi_max(res->pose.position.x + _global_map_size_/2.0, res->pose.position.y + _global_map_size_/2.0, res->pose.position.z + _global_map_size_/2.0);
+    octomap::point3d roi_min(res->pose.position.x - _global_map_size_ / 2.0, res->pose.position.y - _global_map_size_ / 2.0,
+                             res->pose.position.z - _global_map_size_ / 2.0);
+    octomap::point3d roi_max(res->pose.position.x + _global_map_size_ / 2.0, res->pose.position.y + _global_map_size_ / 2.0,
+                             res->pose.position.z + _global_map_size_ / 2.0);
 
     std::shared_ptr<OcTree_t> from;
 
@@ -1852,6 +1854,8 @@ void OctomapServer::insertPointCloud(const geometry_msgs::Vector3& sensorOriginT
     }
   }
   /*//}*/
+
+  octree_local_->setNodeValue(sensor_origin.x(), sensor_origin.y(), sensor_origin.z(), octomap::logodds(0.0));
 
   ros::Time time_end = ros::Time::now();
 
