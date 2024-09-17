@@ -104,9 +104,6 @@
       <remap from="~octomap_local_full_out" to="~octomap_local_full" />
       <remap from="~octomap_local_binary_out" to="~octomap_local_binary" />
 
-      <remap from="~octomap_local_large_full_out" to="~octomap_local_large_full" />
-      <remap from="~octomap_local_large_binary_out" to="~octomap_local_large_binary" />
-
         <!-- services -->
       <remap from="~reset_map_in" to="~reset_map" />
       <remap from="~save_map_in" to="~save_map" />

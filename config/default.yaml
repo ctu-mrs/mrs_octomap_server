@@ -44,6 +44,8 @@ local_map:
 
 global_map:
 
+  size: 80 # [m]
+
   # should create a global map from the local map?
   enabled: true
 
