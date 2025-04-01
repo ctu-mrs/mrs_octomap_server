@@ -61,12 +61,6 @@ global_map:
   publish_full: true # should publish map with full probabilities?
   publish_binary: false # should publish map with binary occupancy?
 
-local_large_map:
-
-  size: 50 # [m]
-  publish_full: true # should publish map with full probabilities?
-  publish_binary: false # should publish map with binary occupancy?
-
 # used only when subscribing 2D LaserScan, pointclouds have separate parameters for each sensor
 unknown_rays:
   update_free_space: true
