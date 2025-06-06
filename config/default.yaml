@@ -2,10 +2,6 @@ map_while_grounded: true
 
 resolution: 0.4
 
-scope_timer:
-  enabled: false
-  file_name: "/tmp/scope_timer_trajectory_generation.txt"
-
 persistency:
 
   enabled: false
@@ -76,8 +72,11 @@ sensor_params:
 
     sensor_0:
 
+      ordered: false  # true: Ouster-like data, false: Livox MID360 like data
       max_range: 20.0 # [m] max range of points to be included as occupied, free space is updated up to min(max_range, free_ray_distance)
       free_ray_distance: 15.0 # [m] max distance for free space raycasting
+
+      ## | --------- Params below apply only if ordered=true -------- #
 
       # fallback values used for free space raycasting for missing data, uses pointcloud dimensions from the incoming message by default
       vertical_fov_angle: deg(90.0)
@@ -128,3 +127,7 @@ sensor_model:
   miss: 0.45 # [0, 1]
   min: 0.3  # [0, 1]
   max: 0.7  # [0, 1]
+
+scope_timer:
+  enabled: false
+  file_name: "/tmp/scope_timer_octomap_server.txt"
