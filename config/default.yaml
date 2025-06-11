@@ -72,7 +72,7 @@ sensor_params:
 
     sensor_0:
 
-      ordered: false  # true: Ouster-like data, false: Livox MID360 like data
+      ordered: true  # true: Ouster-like data, false: Livox MID360 like data
       max_range: 20.0 # [m] max range of points to be included as occupied, free space is updated up to min(max_range, free_ray_distance)
       free_ray_distance: 15.0 # [m] max distance for free space raycasting
 
