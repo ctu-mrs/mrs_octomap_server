@@ -906,15 +906,15 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::PointCloud2::ConstP
 
   pcl::fromROSMsg(*cloud, *pc);
 
-  auto res = transformer_->getTransform(cloud->header.frame_id, _world_frame_, cloud->header.stamp);
+  const auto res = transformer_->getTransform(cloud->header.frame_id, _world_frame_, cloud->header.stamp);
 
   if (!res) {
     ROS_WARN_THROTTLE(1.0, "[OctomapServer]: callback3dLidarCloud2(): could not find tf from %s to %s", cloud->header.frame_id.c_str(), _world_frame_.c_str());
     return;
   }
 
-  Eigen::Matrix4f                 sensorToWorld;
-  geometry_msgs::TransformStamped sensorToWorldTf = res.value();
+  Eigen::Matrix4f                       sensorToWorld;
+  const geometry_msgs::TransformStamped sensorToWorldTf = res.value();
   pcl_ros::transformAsMatrix(sensorToWorldTf.transform, sensorToWorld);
 
   if (!pcl_over_max_range) {
@@ -961,6 +961,7 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::PointCloud2::ConstP
         break;
       }
 
+      // No LUT for LIDAR_3D_UNORDERED
       default: {
         break;
       }
@@ -980,7 +981,7 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::PointCloud2::ConstP
       max_range_sq              = std::pow(sensor_params_3d_lidar_[sensor_id].max_range, 2);
       free_ray_distance         = sensor_params_3d_lidar_[sensor_id].free_ray_distance;
       unknown_clear_occupied    = sensor_params_3d_lidar_[sensor_id].clear_occupied;
-      update_free_space         = sensor_type != LIDAR_3D_UNORDERED && sensor_params_3d_lidar_[sensor_id].update_free_space;
+      update_free_space         = sensor_params_3d_lidar_[sensor_id].update_free_space;
       free_ray_distance_unknown = float(sensor_params_3d_lidar_[sensor_id].free_ray_distance_unknown);
       break;
     }
@@ -990,7 +991,7 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::PointCloud2::ConstP
       max_range_sq              = std::pow(sensor_params_depth_cam_[sensor_id].max_range, 2);
       free_ray_distance         = sensor_params_depth_cam_[sensor_id].free_ray_distance;
       unknown_clear_occupied    = sensor_params_depth_cam_[sensor_id].clear_occupied;
-      update_free_space         = sensor_type != LIDAR_3D_UNORDERED && sensor_params_depth_cam_[sensor_id].update_free_space;
+      update_free_space         = sensor_params_depth_cam_[sensor_id].update_free_space;
       free_ray_distance_unknown = float(sensor_params_depth_cam_[sensor_id].free_ray_distance_unknown);
       break;
     }
@@ -1037,14 +1038,9 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::PointCloud2::ConstP
           }
 
           pcl::PointXYZ temp_pt;
-
-          // TODO: scaling by dist should not be needed (free vectors scaled inside insertPointCloud())
-          /* temp_pt.x = ray_vec(0) * float(free_ray_distance_unknown); */
-          /* temp_pt.y = ray_vec(1) * float(free_ray_distance_unknown); */
-          /* temp_pt.z = ray_vec(2) * float(free_ray_distance_unknown); */
-          temp_pt.x = ray_vec(0);
-          temp_pt.y = ray_vec(1);
-          temp_pt.z = ray_vec(2);
+          temp_pt.x = ray_vec(0) * float(free_ray_distance_unknown);
+          temp_pt.y = ray_vec(1) * float(free_ray_distance_unknown);
+          temp_pt.z = ray_vec(2) * float(free_ray_distance_unknown);
 
           free_vectors_pc->push_back(temp_pt);
         }
@@ -1073,8 +1069,6 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::PointCloud2::ConstP
   free_vectors_pc->header.frame_id = _world_frame_;
 
   insertPointCloud(sensorToWorldTf.transform.translation, hit_pc, free_vectors_pc, free_ray_distance, unknown_clear_occupied);
-
-  const octomap::point3d sensor_origin = octomap::pointTfToOctomap(sensorToWorldTf.transform.translation);
 
   {
     std::scoped_lock lock(mutex_avg_time_cloud_insertion_);
@@ -1206,7 +1200,7 @@ void OctomapServer::timerGlobalMapPublisher([[maybe_unused]] const ros::TimerEve
   /*   octree_global_->prune(); */
   /* } */
 
-  if (pub_map_global_full_) {
+  if (_global_map_publish_full_ && pub_map_global_full_.getNumSubscribers() > 0) {
 
     octomap_msgs::Octomap map;
     map.header.frame_id = _world_frame_;
@@ -1229,7 +1223,7 @@ void OctomapServer::timerGlobalMapPublisher([[maybe_unused]] const ros::TimerEve
     }
   }
 
-  if (_global_map_publish_binary_) {
+  if (_global_map_publish_binary_ && pub_map_global_binary_.getNumSubscribers() > 0) {
 
     octomap_msgs::Octomap map;
     map.header.frame_id = _world_frame_;
@@ -1336,14 +1330,14 @@ void OctomapServer::timerLocalMapPublisher([[maybe_unused]] const ros::TimerEven
 
   ROS_INFO_ONCE("[OctomapServer]: local map publisher timer spinning");
 
-  size_t octomap_size = octree_local_->size();
+  const size_t octomap_size = octree_local_->size();
 
   if (octomap_size <= 1) {
     ROS_WARN("[%s]: Nothing to publish, octree_local_, octree is empty", ros::this_node::getName().c_str());
     return;
   }
 
-  if (_local_map_publish_full_) {
+  if (_local_map_publish_full_ && pub_map_local_full_.getNumSubscribers() > 0) {
 
     octomap_msgs::Octomap map;
     map.header.frame_id = _world_frame_;
@@ -1366,7 +1360,7 @@ void OctomapServer::timerLocalMapPublisher([[maybe_unused]] const ros::TimerEven
     }
   }
 
-  if (_local_map_publish_binary_) {
+  if (_local_map_publish_binary_ && pub_map_local_binary_.getNumSubscribers() > 0) {
 
     octomap_msgs::Octomap map;
     map.header.frame_id = _world_frame_;
@@ -1639,7 +1633,7 @@ void OctomapServer::insertPointCloud(const geometry_msgs::Vector3& sensorOriginT
 
   mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer("OctomapServer::timerInsertPointCloud", scope_timer_logger_, _scope_timer_enabled_);
 
-  ros::Time time_start = ros::Time::now();
+  const ros::Time time_start = ros::Time::now();
 
   std::scoped_lock lock(mutex_octree_local_);
 
@@ -1671,7 +1665,7 @@ void OctomapServer::insertPointCloud(const geometry_msgs::Vector3& sensorOriginT
     // move end point to distance min(free space ray len, current distance)
     measured_point = sensor_origin + (measured_point - sensor_origin).normalize() * std::min(free_space_ray_len, point_distance);
 
-    octomap::OcTreeKey measured_key = octree_local_->coordToKey(measured_point);
+    const octomap::OcTreeKey measured_key = octree_local_->coordToKey(measured_point);
 
     free_ends.insert(measured_key);
   }
@@ -1694,21 +1688,21 @@ void OctomapServer::insertPointCloud(const geometry_msgs::Vector3& sensorOriginT
     // check if the ray intersects a cell in the occupied list
     if (octree_local_->computeRayKeys(sensor_origin, measured_point, keyRay)) {
 
-      octomap::KeyRay::iterator alterantive_ray_end = keyRay.end();
+      octomap::KeyRay::iterator alternative_ray_end = keyRay.end();
 
       if (!unknown_clear_occupied) {
 
         for (octomap::KeyRay::iterator it2 = keyRay.begin(), end = keyRay.end(); it2 != end; ++it2) {
 
           // check if the cell is occupied in the map
-          auto node = octree_local_->search(*it2);
+          const auto node = octree_local_->search(*it2);
 
           if (node && octree_local_->isNodeOccupied(node)) {
 
             if (it2 == keyRay.begin()) {
-              alterantive_ray_end = keyRay.begin();  // special case
+              alternative_ray_end = keyRay.begin();  // special case
             } else {
-              alterantive_ray_end = it2 - 1;
+              alternative_ray_end = it2 - 1;
             }
 
             break;
@@ -1716,44 +1710,44 @@ void OctomapServer::insertPointCloud(const geometry_msgs::Vector3& sensorOriginT
         }
       }
 
-      free_cells.insert(keyRay.begin(), alterantive_ray_end);
+      free_cells.insert(keyRay.begin(), alternative_ray_end);
     }
   }
 
   // for FREE RAY ENDS
   for (octomap::KeySet::iterator it = free_ends.begin(), end = free_ends.end(); it != end; ++it) {
 
-    octomap::point3d coords = octree_local_->keyToCoord(*it);
+    const octomap::point3d coords = octree_local_->keyToCoord(*it);
 
     octomap::KeyRay key_ray;
     if (octree_local_->computeRayKeys(sensor_origin, coords, key_ray)) {
 
-      octomap::KeyRay::iterator alterantive_ray_end = key_ray.end();
+      octomap::KeyRay::iterator alternative_ray_end = key_ray.end();
 
       for (octomap::KeyRay::iterator it2 = key_ray.begin(), end = key_ray.end(); it2 != end; ++it2) {
 
         if (occupied_cells.count(*it2)) {
 
           if (it2 == key_ray.begin()) {
-            alterantive_ray_end = key_ray.begin();  // special case
+            alternative_ray_end = key_ray.begin();  // special case
           } else {
-            alterantive_ray_end = it2 - 1;
+            alternative_ray_end = it2 - 1;
           }
 
           break;
         }
       }
 
-      free_cells.insert(key_ray.begin(), alterantive_ray_end);
+      free_cells.insert(key_ray.begin(), alternative_ray_end);
     }
   }
 
-  octomap::OcTreeNode* root = octree_local_->getRoot();
+  const octomap::OcTreeNode* root = octree_local_->getRoot();
 
-  bool got_root = root ? true : false;
+  const bool got_root = root ? true : false;
 
   if (!got_root) {
-    octomap::OcTreeKey key = octree_local_->coordToKey(0, 0, 0, octree_local_->getTreeDepth());
+    const octomap::OcTreeKey key = octree_local_->coordToKey(0, 0, 0, octree_local_->getTreeDepth());
     octree_local_->setNodeValue(key, octomap::logodds(0.0));
   }
 
@@ -1777,16 +1771,16 @@ void OctomapServer::insertPointCloud(const geometry_msgs::Vector3& sensorOriginT
 
     mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer("OctomapServer::localMapCopy", scope_timer_logger_, _scope_timer_enabled_);
 
-    auto [local_map_width, local_map_height] = mrs_lib::get_mutexed(mutex_local_map_dimensions_, local_map_width_, local_map_height_);
+    const auto [local_map_width, local_map_height] = mrs_lib::get_mutexed(mutex_local_map_dimensions_, local_map_width_, local_map_height_);
 
-    float x        = sensor_origin.x();
-    float y        = sensor_origin.y();
-    float z        = sensor_origin.z();
-    float width_2  = local_map_width / float(2.0);
-    float height_2 = local_map_height / float(2.0);
+    const float x        = sensor_origin.x();
+    const float y        = sensor_origin.y();
+    const float z        = sensor_origin.z();
+    const float width_2  = local_map_width / float(2.0);
+    const float height_2 = local_map_height / float(2.0);
 
-    octomap::point3d roi_min(x - width_2, y - width_2, z - height_2);
-    octomap::point3d roi_max(x + width_2, y + width_2, z + height_2);
+    const octomap::point3d roi_min(x - width_2, y - width_2, z - height_2);
+    const octomap::point3d roi_max(x + width_2, y + width_2, z + height_2);
 
     std::shared_ptr<OcTree_t> from;
 
@@ -1850,7 +1844,7 @@ void OctomapServer::insertPointCloud(const geometry_msgs::Vector3& sensorOriginT
 
   octree_local_->setNodeValue(sensor_origin.x(), sensor_origin.y(), sensor_origin.z(), octomap::logodds(0.0));
 
-  ros::Time time_end = ros::Time::now();
+  const ros::Time time_end = ros::Time::now();
 
   {
     std::scoped_lock lock(mutex_local_map_duty_);
