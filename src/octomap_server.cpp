@@ -588,7 +588,7 @@ void OctomapServer::onInit() {
   /* transformer //{ */
 
   transformer_ = std::make_unique<mrs_lib::Transformer>("OctomapServer");
-  transformer_->setDefaultPrefix(_uav_name_);
+  /* transformer_->setDefaultPrefix(_uav_name_); */
   transformer_->setLookupTimeout(ros::Duration(0.5));
   transformer_->retryLookupNewest(false);
 
@@ -914,8 +914,8 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::PointCloud2::ConstP
         if (sensor_params_3d_lidar_[sensor_id].horizontal_rays != cloud->width || sensor_params_3d_lidar_[sensor_id].vertical_rays != cloud->height) {
           sensor_params_3d_lidar_[sensor_id].horizontal_rays = cloud->width;
           sensor_params_3d_lidar_[sensor_id].vertical_rays   = cloud->height;
-          ROS_INFO("[OctomapServer]: Changing sensor params for lidar %d to %d horizontal rays, %d vertical rays.", sensor_id,
-                   sensor_params_3d_lidar_[sensor_id].horizontal_rays, sensor_params_3d_lidar_[sensor_id].vertical_rays);
+          /* ROS_INFO("[OctomapServer]: Changing sensor params for lidar %d to %d horizontal rays, %d vertical rays.", sensor_id, */
+          /*          sensor_params_3d_lidar_[sensor_id].horizontal_rays, sensor_params_3d_lidar_[sensor_id].vertical_rays); */
           initialize3DLidarLUT(sensor_3d_lidar_xyz_lut_[sensor_id], sensor_params_3d_lidar_[sensor_id]);
         }
 
