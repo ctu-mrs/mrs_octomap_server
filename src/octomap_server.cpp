@@ -15,6 +15,7 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/LaserScan.h>
 #include <sensor_msgs/CameraInfo.h>
+#include <sensor_msgs/point_cloud2_iterator.h>
 #include <std_srvs/Empty.h>
 
 #include <eigen3/Eigen/Eigen>
@@ -176,6 +177,8 @@ private:
   ros::Publisher pub_map_local_full_;
   ros::Publisher pub_map_local_binary_;
 
+  ros::Publisher pub_cam_closest_obst_;
+
   // | -------------------- service serviers -------------------- |
 
   ros::ServiceServer ss_reset_map_;
@@ -203,6 +206,9 @@ private:
 
   ros::Timer timer_altitude_alignment_;
   void       timerAltitudeAlignment([[maybe_unused]] const ros::TimerEvent& event);
+
+  ros::Timer timer_camera_obstacle_distance_;
+  void       timerCameraObstacleDistancePublisher([[maybe_unused]] const ros::TimerEvent& event);
 
   // | ----------------------- parameters ----------------------- |
 
@@ -602,6 +608,8 @@ void OctomapServer::onInit() {
   pub_map_local_full_   = nh_.advertise<octomap_msgs::Octomap>("octomap_local_full_out", 1);
   pub_map_local_binary_ = nh_.advertise<octomap_msgs::Octomap>("octomap_local_binary_out", 1);
 
+  pub_cam_closest_obst_ = nh_.advertise<sensor_msgs::PointCloud2>("cam_closest_obst_out", 1);
+
   //}
 
   /* subscribers //{ */
@@ -686,6 +694,8 @@ void OctomapServer::onInit() {
   if (_persistency_enabled_ && _persistency_align_altitude_enabled_) {
     timer_altitude_alignment_ = nh_.createTimer(ros::Rate(1.0), &OctomapServer::timerAltitudeAlignment, this);
   }
+
+  timer_camera_obstacle_distance_ = nh_.createTimer(ros::Rate(5.0), &OctomapServer::timerCameraObstacleDistancePublisher, this);
 
   //}
 
@@ -825,8 +835,6 @@ void OctomapServer::callbackLaserScan(const sensor_msgs::LaserScan::ConstPtr msg
   free_vectors_pc->header.frame_id = _world_frame_;
 
   insertPointCloud(sensorToWorldTf.transform.translation, pc, free_vectors_pc, _unknown_rays_distance_, _unknown_rays_clear_occupied_);
-
-  const octomap::point3d sensor_origin = octomap::pointTfToOctomap(sensorToWorldTf.transform.translation);
 }
 
 //}
@@ -1087,11 +1095,10 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::PointCloud2::ConstP
   {
     std::scoped_lock lock(mutex_avg_time_cloud_insertion_);
 
-    ros::Time time_end = ros::Time::now();
+    const ros::Time time_end      = ros::Time::now();
+    const double    exec_duration = (time_end - time_start).toSec();
+    const double    coef          = 0.5;
 
-    double exec_duration = (time_end - time_start).toSec();
-
-    double coef               = 0.5;
     avg_time_cloud_insertion_ = coef * avg_time_cloud_insertion_ + (1.0 - coef) * exec_duration;
 
     ROS_INFO_THROTTLE(1.0, "[OctomapServer]: avg cloud insertion time = %.3f sec", avg_time_cloud_insertion_);
@@ -1635,6 +1642,117 @@ void OctomapServer::timerAltitudeAlignment([[maybe_unused]] const ros::TimerEven
   octrees_initialized_ = true;
 
   timer_altitude_alignment_.stop();
+}
+
+//}
+//
+/* timerCameraObstacleDistancePublisher() //{ */
+
+void OctomapServer::timerCameraObstacleDistancePublisher([[maybe_unused]] const ros::TimerEvent& evt) {
+
+  if (!is_initialized_) {
+    return;
+  }
+
+  ROS_INFO_ONCE("[OctomapServer]: camera obstacle distance timer spinning");
+
+  // | ------ get the current camera position in the map frame ----- |
+
+  const std::string cam_frame = _uav_name_ + "/siyi_zt6_cam";
+  auto              res       = transformer_->getTransform(cam_frame, _world_frame_);
+
+  geometry_msgs::Transform cam_pose;
+
+  if (res) {
+
+    cam_pose = res->transform;
+
+    /* ROS_INFO("[OctomapServer]: robot coordinates %.2f, %.2f, %.2f", robot_x, robot_y, robot_z); */
+
+  } else {
+
+    ROS_INFO_THROTTLE(1.0, "[OctomapServer]: waiting for the tf from %s to %s", _world_frame_.c_str(), cam_frame.c_str());
+    return;
+  }
+
+  // | -------------- Compute raycasting parameters ------------- |
+  const auto cam_xyz    = cam_pose.translation;
+  const auto cam_R_wxyz = cam_pose.rotation;
+
+  const Eigen::Vector3f    t = Eigen::Vector3f(cam_xyz.x, cam_xyz.y, cam_xyz.z);
+  const Eigen::Quaternionf R = Eigen::Quaternionf(cam_R_wxyz.w, cam_R_wxyz.x, cam_R_wxyz.y, cam_R_wxyz.z);
+
+  // Transform 5 m in camera to world
+  const Eigen::Vector3f pt_in_cam   = Eigen::Vector3f(5.0, 0.0, 0.0);
+  const Eigen::Vector3f pt_in_world = R * pt_in_cam + t;
+
+  const octomap::point3d raycast_from = octomap::pointTfToOctomap(cam_pose.translation);
+  const octomap::point3d raycast_to   = octomap::point3d(pt_in_world.x(), pt_in_world.y(), pt_in_world.z());
+
+  bool             hit = false;
+  octomap::point3d hit_coords;
+
+  // |  Raycast from camera to the first obstacle on its optical axis  |
+  {
+    std::scoped_lock lock(mutex_octree_local_);
+
+    octomap::KeyRay keyRay;
+
+    // check if the ray intersects a cell in the occupied list
+    if (octree_local_->computeRayKeys(raycast_from, raycast_to, keyRay)) {
+
+      for (auto it = keyRay.begin(), end = keyRay.end(); it != end; ++it) {
+
+        // check if the cell is occupied in the map
+        const auto node = octree_local_->search(*it);
+        hit             = node && octree_local_->isNodeOccupied(node);
+
+        // store first hit point
+        if (hit) {
+          hit_coords = octree_local_->keyToCoord(*it);
+          break;
+        }
+      }
+    }
+  }
+
+  // | ------------------------- Publish ------------------------ |
+  if (hit) {
+
+    /* ROS_ERROR("[OctomapServer]: camera to obst distance: %.2f m", hit_coords.norm()); */
+
+    sensor_msgs::PointCloud2 cloud_msg;
+
+    // Fill header
+    cloud_msg.header.stamp    = ros::Time::now();
+    cloud_msg.header.frame_id = _world_frame_;  // change to your desired frame
+
+    // Set fields (x, y, z)
+    cloud_msg.height   = 1;
+    cloud_msg.width    = 1;  // only one point
+    cloud_msg.is_dense = true;
+
+    sensor_msgs::PointCloud2Modifier modifier(cloud_msg);
+    modifier.setPointCloud2FieldsByString(1, "xyz");
+    modifier.resize(1);
+
+    // Use iterator to set the single point
+    sensor_msgs::PointCloud2Iterator<float> iter_x(cloud_msg, "x");
+    sensor_msgs::PointCloud2Iterator<float> iter_y(cloud_msg, "y");
+    sensor_msgs::PointCloud2Iterator<float> iter_z(cloud_msg, "z");
+
+    // Set your custom point coordinates here:
+    *iter_x = hit_coords.x();
+    *iter_y = hit_coords.y();
+    *iter_z = hit_coords.z();
+
+    pub_cam_closest_obst_.publish(cloud_msg);
+
+  } 
+  /* else { */
+
+  /*   ROS_ERROR("[OctomapServer]: camera to obst distance: NO HIT"); */
+  /* } */
 }
 
 //}

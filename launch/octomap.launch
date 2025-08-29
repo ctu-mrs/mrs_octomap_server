@@ -104,6 +104,8 @@
       <remap from="~octomap_local_full_out" to="~octomap_local_full" />
       <remap from="~octomap_local_binary_out" to="~octomap_local_binary" />
 
+      <remap from="~cam_closest_obst_out" to="~obstacles/camera_axis" />
+
         <!-- services -->
       <remap from="~reset_map_in" to="~reset_map" />
       <remap from="~save_map_in" to="~save_map" />
