@@ -11,7 +11,7 @@
 #include <octomap/OcTreeKey.h>
 
 #include <geometry_msgs/msg/Points.hpp>
-#include <geometry_msgs/msg/Vector#.hpp>
+#include <geometry_msgs/msg/Vector3.hpp>
 #include <geometry_msgs/msg/TransformStamped.hpp>
 #include <sensor_msgs/msg/PointCloud2.hpp>
 #include <sensor_msgs/msg/LaserScan.hpp>
@@ -142,10 +142,10 @@ class OctomapServer : public nodelet::Nodelet {
 public:
   virtual void onInit();
 
-  bool callbackLoadMap(mrs_msgs::String::Request& req, [[maybe_unused]] mrs_msgs::String::Response& resp);
-  bool callbackSaveMap(mrs_msgs::String::Request& req, [[maybe_unused]] mrs_msgs::String::Response& resp);
+  bool callbackLoadMap(mrs_msgs::msg::msgString::Request& req, [[maybe_unused]] mrs_msgs::msg::String::Response& resp);
+  bool callbackSaveMap(mrs_msgs::msg::String::Request& req, [[maybe_unused]] mrs_msgs::msg::String::Response& resp);
 
-  bool callbackResetMap(std_srvs::Empty::Request& req, std_srvs::Empty::Response& resp);
+  bool callbackResetMap(std_srvs::srv::Empty::Request& req, std_srvs::srv::Empty::Response& resp);
 
   void callback3dLidarCloud2(const sensor_msgs::PointCloud2::ConstPtr msg, const SensorType_t sensor_type, const int sensor_id, const std::string topic,
                              const bool pcl_over_max_range = false);
@@ -161,14 +161,14 @@ private:
 
   // | -------------------- topic subscribers ------------------- |
 
-  mrs_lib::SubscribeHandler<mrs_msgs::ControlManagerDiagnostics> sh_control_manager_diag_;
-  mrs_lib::SubscribeHandler<mrs_msgs::Float64Stamped>            sh_height_;
-  mrs_lib::SubscribeHandler<mrs_octomap_server::PoseWithSize>    sh_clear_box_;
+  mrs_lib::SubscribeHandler<mrs_msgs::msg::ControlManagerDiagnostics> sh_control_manager_diag_;
+  mrs_lib::SubscribeHandler<mrs_msgs::msg::Float64Stamped>            sh_height_;
+  mrs_lib::SubscribeHandler<mrs_octomap_server::msg::PoseWithSize>    sh_clear_box_;
 
-  std::vector<mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>> sh_3dlaser_pc2_;
-  std::vector<mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>> sh_depth_cam_pc2_;
-  std::vector<mrs_lib::SubscribeHandler<sensor_msgs::CameraInfo>>  sh_depth_cam_info_;
-  std::vector<mrs_lib::SubscribeHandler<sensor_msgs::LaserScan>>   sh_laser_scan_;
+  std::vector<mrs_lib::SubscribeHandler<sensor_msgs::msg::PointCloud2>> sh_3dlaser_pc2_;
+  std::vector<mrs_lib::SubscribeHandler<sensor_msgs::msg::PointCloud2>> sh_depth_cam_pc2_;
+  std::vector<mrs_lib::SubscribeHandler<sensor_msgs::msg::CameraInfo>>  sh_depth_cam_info_;
+  std::vector<mrs_lib::SubscribeHandler<sensor_msgs::msg::LaserScan>>   sh_laser_scan_;
 
   // | ----------------------- publishers ----------------------- |
 
