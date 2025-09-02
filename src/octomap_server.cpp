@@ -15,7 +15,6 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/LaserScan.h>
 #include <sensor_msgs/CameraInfo.h>
-#include <sensor_msgs/point_cloud2_iterator.h>
 #include <std_srvs/Empty.h>
 
 #include <eigen3/Eigen/Eigen>
@@ -608,7 +607,7 @@ void OctomapServer::onInit() {
   pub_map_local_full_   = nh_.advertise<octomap_msgs::Octomap>("octomap_local_full_out", 1);
   pub_map_local_binary_ = nh_.advertise<octomap_msgs::Octomap>("octomap_local_binary_out", 1);
 
-  pub_cam_closest_obst_ = nh_.advertise<sensor_msgs::PointCloud2>("cam_closest_obst_out", 1);
+  pub_cam_closest_obst_ = nh_.advertise<geometry_msgs::PointStamped>("cam_closest_obst_out", 1);
 
   //}
 
@@ -1682,14 +1681,14 @@ void OctomapServer::timerCameraObstacleDistancePublisher([[maybe_unused]] const 
   const Eigen::Vector3f    t = Eigen::Vector3f(cam_xyz.x, cam_xyz.y, cam_xyz.z);
   const Eigen::Quaternionf R = Eigen::Quaternionf(cam_R_wxyz.w, cam_R_wxyz.x, cam_R_wxyz.y, cam_R_wxyz.z);
 
-  // Transform 5 m in camera to world
+  // Transform 5 m forward vector in camera to world
   const Eigen::Vector3f pt_in_cam   = Eigen::Vector3f(5.0, 0.0, 0.0);
   const Eigen::Vector3f pt_in_world = R * pt_in_cam + t;
 
   const octomap::point3d raycast_from = octomap::pointTfToOctomap(cam_pose.translation);
   const octomap::point3d raycast_to   = octomap::point3d(pt_in_world.x(), pt_in_world.y(), pt_in_world.z());
 
-  bool             hit = false;
+  bool             hit        = false;
   octomap::point3d hit_coords;
 
   // |  Raycast from camera to the first obstacle on its optical axis  |
@@ -1721,38 +1720,16 @@ void OctomapServer::timerCameraObstacleDistancePublisher([[maybe_unused]] const 
 
     /* ROS_ERROR("[OctomapServer]: camera to obst distance: %.2f m", hit_coords.norm()); */
 
-    sensor_msgs::PointCloud2 cloud_msg;
+    geometry_msgs::PointStamped pt_msg;
+    pt_msg.header.frame_id = _world_frame_;
+    pt_msg.header.stamp    = ros::Time::now();
 
-    // Fill header
-    cloud_msg.header.stamp    = ros::Time::now();
-    cloud_msg.header.frame_id = _world_frame_;  // change to your desired frame
+    pt_msg.point.x = hit_coords.x();
+    pt_msg.point.y = hit_coords.y();
+    pt_msg.point.z = hit_coords.z();
 
-    // Set fields (x, y, z)
-    cloud_msg.height   = 1;
-    cloud_msg.width    = 1;  // only one point
-    cloud_msg.is_dense = true;
-
-    sensor_msgs::PointCloud2Modifier modifier(cloud_msg);
-    modifier.setPointCloud2FieldsByString(1, "xyz");
-    modifier.resize(1);
-
-    // Use iterator to set the single point
-    sensor_msgs::PointCloud2Iterator<float> iter_x(cloud_msg, "x");
-    sensor_msgs::PointCloud2Iterator<float> iter_y(cloud_msg, "y");
-    sensor_msgs::PointCloud2Iterator<float> iter_z(cloud_msg, "z");
-
-    // Set your custom point coordinates here:
-    *iter_x = hit_coords.x();
-    *iter_y = hit_coords.y();
-    *iter_z = hit_coords.z();
-
-    pub_cam_closest_obst_.publish(cloud_msg);
-
-  } 
-  /* else { */
-
-  /*   ROS_ERROR("[OctomapServer]: camera to obst distance: NO HIT"); */
-  /* } */
+    pub_cam_closest_obst_.publish(pt_msg);
+  }
 }
 
 //}
