@@ -1,7 +1,8 @@
 /* includes //{ */
 
-#include <ros/init.h>
-#include <ros/ros.h>
+//#include <ros/init.h>
+#include "rclcpp/rclcpp.hpp"
+
 #include <nodelet/nodelet.h>
 
 #include <octomap/OcTreeNode.h>
@@ -9,13 +10,13 @@
 #include <octomap/octomap.h>
 #include <octomap/OcTreeKey.h>
 
-#include <geometry_msgs/Point.h>
-#include <geometry_msgs/Vector3.h>
-#include <geometry_msgs/TransformStamped.h>
-#include <sensor_msgs/PointCloud2.h>
-#include <sensor_msgs/LaserScan.h>
-#include <sensor_msgs/CameraInfo.h>
-#include <std_srvs/Empty.h>
+#include <geometry_msgs/msg/Points.hpp>
+#include <geometry_msgs/msg/Vector#.hpp>
+#include <geometry_msgs/msg/TransformStamped.hpp>
+#include <sensor_msgs/msg/PointCloud2.hpp>
+#include <sensor_msgs/msg/LaserScan.hpp>
+#include <sensor_msgs/msg/CameraInfo.hpp>
+#include <std_srvs/srv/Points.hpp>
 
 #include <eigen3/Eigen/Eigen>
 
@@ -30,12 +31,14 @@
 
 #include <Eigen/Geometry>
 
-#include <octomap_msgs/BoundingBoxQueryRequest.h>
-#include <octomap_msgs/GetOctomapRequest.h>
-#include <octomap_msgs/conversions.h>
-#include <octomap_msgs/Octomap.h>
-#include <octomap_msgs/GetOctomap.h>
-#include <octomap_msgs/BoundingBoxQuery.h>
+
+#include <octomap_msgs/msg/BoundingBoxQueryRequest.h>
+#include <octomap_msgs/msg/BoundingBoxQueryRequest.h>
+#include <octomap_msgs/msg/BoundingBoxQueryRequest.h>
+#include <octomap_msgs/msg/BoundingBoxQueryRequest.h>
+#include <octomap_msgs/msg/BoundingBoxQueryRequest.h>
+#include <octomap_msgs/msg/BoundingBoxQueryRequest.h>
+
 
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/transformer.h>
@@ -45,11 +48,10 @@
 
 #include <mrs_octomap_tools/octomap_methods.h>
 
-#include <mrs_msgs/String.h>
-#include <mrs_msgs/ControlManagerDiagnostics.h>
-#include <mrs_msgs/Float64Stamped.h>
-
-#include <mrs_msgs/SetInt.h>
+#include <mrs_msgs/msg/String.hpp>
+#include <mrs_msgs/msg/ControlManagerDiagnostics.hpp>
+#include <mrs_msgs/msg/Float64Stamped.hpp>
+#include <mrs_msgs/msg/SetInt.hpp>
 
 #include <filesystem>
 
