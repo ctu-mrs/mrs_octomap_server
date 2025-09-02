@@ -1678,18 +1678,18 @@ void OctomapServer::timerCameraObstacleDistancePublisher([[maybe_unused]] const 
   const auto cam_xyz    = cam_pose.translation;
   const auto cam_R_wxyz = cam_pose.rotation;
 
-  const Eigen::Vector3f    t = Eigen::Vector3f(cam_xyz.x, cam_xyz.y, cam_xyz.z);
-  const Eigen::Quaternionf R = Eigen::Quaternionf(cam_R_wxyz.w, cam_R_wxyz.x, cam_R_wxyz.y, cam_R_wxyz.z);
+  const Eigen::Vector3f    t_cam = Eigen::Vector3f(cam_xyz.x, cam_xyz.y, cam_xyz.z);
+  const Eigen::Quaternionf R_cam = Eigen::Quaternionf(cam_R_wxyz.w, cam_R_wxyz.x, cam_R_wxyz.y, cam_R_wxyz.z);
 
   // Transform 5 m forward vector in camera to world
   const Eigen::Vector3f pt_in_cam   = Eigen::Vector3f(5.0, 0.0, 0.0);
-  const Eigen::Vector3f pt_in_world = R * pt_in_cam + t;
+  const Eigen::Vector3f pt_in_world = R_cam * pt_in_cam + t_cam;
 
   const octomap::point3d raycast_from = octomap::pointTfToOctomap(cam_pose.translation);
   const octomap::point3d raycast_to   = octomap::point3d(pt_in_world.x(), pt_in_world.y(), pt_in_world.z());
 
-  bool             hit        = false;
-  octomap::point3d hit_coords;
+  bool             hit = false;
+  octomap::point3d hit_pt;
 
   // |  Raycast from camera to the first obstacle on its optical axis  |
   {
@@ -1708,7 +1708,7 @@ void OctomapServer::timerCameraObstacleDistancePublisher([[maybe_unused]] const 
 
         // store first hit point
         if (hit) {
-          hit_coords = octree_local_->keyToCoord(*it);
+          hit_pt = octree_local_->keyToCoord(*it);
           break;
         }
       }
@@ -1718,15 +1718,19 @@ void OctomapServer::timerCameraObstacleDistancePublisher([[maybe_unused]] const 
   // | ------------------------- Publish ------------------------ |
   if (hit) {
 
-    /* ROS_ERROR("[OctomapServer]: camera to obst distance: %.2f m", hit_coords.norm()); */
+    /* ROS_ERROR("[OctomapServer]: camera to obst distance: %.2f m", hit_pt.norm()); */
+
+    // transform hit_pt from world to cam
+    const Eigen::Vector3f hit_pt_in_world = Eigen::Vector3f(hit_pt.x(), hit_pt.y(), hit_pt.z());
+    const Eigen::Vector3f hit_pt_in_cam   = R_cam.inverse() * (hit_pt_in_world - t_cam);
 
     geometry_msgs::PointStamped pt_msg;
-    pt_msg.header.frame_id = _world_frame_;
+    pt_msg.header.frame_id = cam_frame;
     pt_msg.header.stamp    = ros::Time::now();
 
-    pt_msg.point.x = hit_coords.x();
-    pt_msg.point.y = hit_coords.y();
-    pt_msg.point.z = hit_coords.z();
+    pt_msg.point.x = hit_pt_in_cam.x();
+    pt_msg.point.y = hit_pt_in_cam.y();
+    pt_msg.point.z = hit_pt_in_cam.z();
 
     pub_cam_closest_obst_.publish(pt_msg);
   }
