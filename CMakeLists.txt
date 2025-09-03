@@ -4,126 +4,107 @@ project(mrs_octomap_server)
 add_definitions(-DOCTOMAP_NODEBUGOUT)
 add_definitions(-O3)
 
-# disables anoying googletest warning
-set(CATKIN_ENABLE_TESTING FALSE)
+# Default to C++14
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 14)
+endif()
 
-# disables anoying PCL warnings
-set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS 1 CACHE INTERNAL "No dev warnings")
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
 
-set(CATKIN_DEPENDENCIES
-  cmake_modules
+set(DEPENDENCIES
+  ament_cmake
+  rclcpp
+  sensor_msgs
+  std_srvs
   geometry_msgs
   laser_geometry
-  message_generation
-  message_runtime
   mrs_lib
   mrs_msgs
-  nodelet
   octomap_msgs
   octomap_ros
   mrs_octomap_tools
   pcl_conversions
   pcl_msgs
   pcl_ros
-  roscpp
-  sensor_msgs
-  std_msgs
   )
 
-set(LIBRARIES
-  MrsOctomapServer_Server
-  )
 
-find_package(OpenMP REQUIRED)
+foreach(DEP IN LISTS DEPENDENCIES)
+  find_package(${DEP} REQUIRED)
+endforeach()
 
-find_package(octomap REQUIRED)
-
-find_package(PCL REQUIRED COMPONENTS
-  common
-  )
-
-# include Eigen3
-find_package(Eigen3 REQUIRED)
-set(Eigen_INCLUDE_DIRS ${EIGEN3_INCLUDE_DIRS})
-set(Eigen_LIBRARIES ${Eigen_LIBRARIES})
-
-find_package(catkin REQUIRED COMPONENTS
-  ${CATKIN_DEPENDENCIES}
-  )
-
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
-# add_compile_options("-fsanitize=address")
-# add_link_options("-fsanitize=address")
-
-add_compile_options("${PCL_COMPILE_OPTIONS}")
-
-add_message_files(DIRECTORY msg FILES
-  PoseWithSize.msg
-)
-
-generate_messages(DEPENDENCIES
-  std_msgs
-  geometry_msgs
-)
-
-catkin_package(
-  INCLUDE_DIRS include
-  LIBRARIES ${LIBRARIES}
-  CATKIN_DEPENDS ${CATKIN_DEPENDENCIES}
-  DEPENDS OCTOMAP
-  )
 
 include_directories(
   include
-  ${catkin_INCLUDE_DIRS}
-  ${Eigen_INCLUDE_DIRS}
-  ${OCTOMAP_INCLUDE_DIRS}
-  ${PCL_INCLUDE_DIRS}
-  )
-
-link_directories(
-  ${PCL_LIBRARIES}
+  ${mrs_lib_INCLUDE_DIRS}
+  ${mrs_uav_testing_INCLUDE_DIRS}
+  ${rclcpp_INCLUDE_DIRS}
 )
 
-# Server
-
-add_library(MrsOctomapServer_Server
-  src/octomap_server.cpp
-  src/conversions.cpp
-  )
-
-add_dependencies(MrsOctomapServer_Server
-  ${${PROJECT_NAME}_EXPORTED_TARGETS}
-  ${catkin_EXPORTED_TARGETS}
-  )
-
-target_include_directories(MrsOctomapServer_Server PUBLIC
-  ${PCL_INCLUDE_DIRS}
-  )
-
-target_link_libraries(MrsOctomapServer_Server
-  ${catkin_LIBRARIES}
-  ${PCL_LIBRARIES}
-  ${OCTOMAP_LIBRARIES}
-  )
 
 ## --------------------------------------------------------------
-## |                           Install                          |
+## |                       export plugins                       |
 ## --------------------------------------------------------------
 
-install(TARGETS ${LIBRARIES}
-  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
-  )
+# <package of the base class>, <relative path to the xml>
+pluginlib_export_plugin_description_file(mrs_octomap_server plugins.xml)
 
-install(DIRECTORY launch config
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-  )
 
-install(FILES nodelets.xml
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-  )
+
+## --------------------------------------------------------------
+## |                           testing                          |
+## --------------------------------------------------------------
+
+if(ENABLE_TESTS)
+
+  add_subdirectory(test)
+
+endif()
+
+## --------------------------------------------------------------
+## |                           install                          |
+## --------------------------------------------------------------
+
+ament_export_libraries(
+  ${LIBRARIES}
+)
+
+install(
+  TARGETS ${LIBRARIES}
+  EXPORT export_${PROJECT_NAME}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+
+install(
+  DIRECTORY include
+  DESTINATION .
+)
+
+install(
+  DIRECTORY config
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(
+  DIRECTORY scripts
+  USE_SOURCE_PERMISSIONS
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+ament_export_include_directories(
+  include
+)
+
+ament_export_targets(
+  export_${PROJECT_NAME} HAS_LIBRARY_TARGET
+)
+
+ament_export_dependencies(
+  ${DEPENDENCIES}
+)
+
+ament_package()
