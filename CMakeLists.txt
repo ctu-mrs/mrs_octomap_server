@@ -1,23 +1,57 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.8)
 project(mrs_octomap_server)
 
-add_definitions(-DOCTOMAP_NODEBUGOUT)
-add_definitions(-O3)
+# Compiler options
+add_compile_options(-O3 -DOCTOMAP_NODEBUGOUT)
 
-# Default to C++14
-if(NOT CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 14)
-endif()
+# Find dependencies
+find_package(ament_cmake REQUIRED)
+find_package(Eigen3 REQUIRED)
+find_package(octomap REQUIRED)
+find_package(PCL REQUIRED COMPONENTS common)
+find_package(OpenMP REQUIRED)
 
-if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
-endif()
+find_package(geometry_msgs REQUIRED)
+find_package(laser_geometry REQUIRED)
+find_package(mrs_lib REQUIRED)
+find_package(mrs_msgs REQUIRED)
+find_package(octomap_msgs REQUIRED)
+find_package(octomap_ros REQUIRED)
+find_package(mrs_octomap_tools REQUIRED)
+find_package(pcl_conversions REQUIRED)
+find_package(pcl_msgs REQUIRED)
+find_package(pcl_ros REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rclcpp_components REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 
-set(DEPENDENCIES
-  ament_cmake
-  rclcpp
-  sensor_msgs
-  std_srvs
+# Messages (ROS2)
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/PoseWithSize.msg"
+  DEPENDENCIES std_msgs geometry_msgs
+)
+
+set(LIBRARIES MrsOctomapServer_Server)
+
+include_directories(
+  include
+  ${EIGEN3_INCLUDE_DIRS}
+  ${OCTOMAP_INCLUDE_DIRS}
+  ${PCL_INCLUDE_DIRS}
+)
+
+# Server library
+add_library(MrsOctomapServer_Server
+  src/octomap_server.cpp
+  src/conversions.cpp
+)
+
+ament_target_dependencies(MrsOctomapServer_Server
+  Eigen3
+  octomap
+  PCL
   geometry_msgs
   laser_geometry
   mrs_lib
@@ -28,83 +62,36 @@ set(DEPENDENCIES
   pcl_conversions
   pcl_msgs
   pcl_ros
-  )
-
-
-foreach(DEP IN LISTS DEPENDENCIES)
-  find_package(${DEP} REQUIRED)
-endforeach()
-
-
-include_directories(
-  include
-  ${mrs_lib_INCLUDE_DIRS}
-  ${mrs_uav_testing_INCLUDE_DIRS}
-  ${rclcpp_INCLUDE_DIRS}
+  rclcpp
+  sensor_msgs
+  std_msgs
 )
 
-
-## --------------------------------------------------------------
-## |                       export plugins                       |
-## --------------------------------------------------------------
-
-# <package of the base class>, <relative path to the xml>
-pluginlib_export_plugin_description_file(mrs_octomap_server plugins.xml)
-
-
-
-## --------------------------------------------------------------
-## |                           testing                          |
-## --------------------------------------------------------------
-
-if(ENABLE_TESTS)
-
-  add_subdirectory(test)
-
-endif()
-
-## --------------------------------------------------------------
-## |                           install                          |
-## --------------------------------------------------------------
-
-ament_export_libraries(
-  ${LIBRARIES}
+target_include_directories(MrsOctomapServer_Server PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+  ${PCL_INCLUDE_DIRS}
 )
 
-install(
-  TARGETS ${LIBRARIES}
-  EXPORT export_${PROJECT_NAME}
+target_link_libraries(MrsOctomapServer_Server
+  ${PCL_LIBRARIES}
+  ${OCTOMAP_LIBRARIES}
+)
+
+# Install
+install(TARGETS ${LIBRARIES}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
 )
 
-install(
-  DIRECTORY include
-  DESTINATION .
-)
-
-install(
-  DIRECTORY config
+install(DIRECTORY launch config
   DESTINATION share/${PROJECT_NAME}
 )
 
-install(
-  DIRECTORY scripts
-  USE_SOURCE_PERMISSIONS
-  DESTINATION lib/${PROJECT_NAME}
-)
 
-ament_export_include_directories(
-  include
-)
-
-ament_export_targets(
-  export_${PROJECT_NAME} HAS_LIBRARY_TARGET
-)
-
-ament_export_dependencies(
-  ${DEPENDENCIES}
-)
+ament_export_include_directories(include)
+ament_export_libraries(${LIBRARIES})
+ament_export_dependencies(Eigen3 octomap PCL)
 
 ament_package()

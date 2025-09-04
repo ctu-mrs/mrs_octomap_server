@@ -3,7 +3,6 @@
 //#include <ros/init.h>
 #include "rclcpp/rclcpp.hpp"
 
-#include <nodelet/nodelet.h>
 
 #include <octomap/OcTreeNode.h>
 #include <octomap/octomap_types.h>
@@ -48,10 +47,6 @@
 
 #include <mrs_octomap_tools/octomap_methods.h>
 
-#include <mrs_msgs/msg/String.hpp>
-#include <mrs_msgs/msg/ControlManagerDiagnostics.hpp>
-#include <mrs_msgs/msg/Float64Stamped.hpp>
-#include <mrs_msgs/msg/SetInt.hpp>
 
 #include <filesystem>
 
@@ -137,53 +132,53 @@ const std::string _sensor_names_[] = {"LIDAR_3D", "LIDAR_2D", "LIDAR_1D", "DEPTH
 
 /* class OctomapServer //{ */
 
-class OctomapServer : public nodelet::Nodelet {
+class OctomapServer : public rclcpp::Node {
 
 public:
   virtual void onInit();
 
-  bool callbackLoadMap(mrs_msgs::msg::msgString::Request& req, [[maybe_unused]] mrs_msgs::msg::String::Response& resp);
-  bool callbackSaveMap(mrs_msgs::msg::String::Request& req, [[maybe_unused]] mrs_msgs::msg::String::Response& resp);
+  bool callbackLoadMap(std::shared_ptr<mrs_msgs::msg::msgString::Request> req, [[maybe_unused]] std::shared_ptr<mrs_msgs::msg::String::Response> resp);
+  bool callbackSaveMap(std::shared_ptr<mrs_msgs::msg::String::Request> req, [[maybe_unused]] std::shared_ptr<mrs_msgs::msg::String::Response> resp);
 
-  bool callbackResetMap(std_srvs::srv::Empty::Request& req, std_srvs::srv::Empty::Response& resp);
+  bool callbackResetMap(std::shared_ptr<std_srvs::srv::Empty::Request> req, std::shared_ptr<std_srvs::srv::Empty::Response> resp);
 
-  void callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::ConstPtr msg, const SensorType_t sensor_type, const int sensor_id, const std::string topic,
+  void callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::SharedPtr msg, const SensorType_t sensor_type, const int sensor_id, const std::string topic,
                              const bool pcl_over_max_range = false);
 
-  void callbackLaserScan(const sensor_msgs::msg::LaserScan::ConstPtr msg);
-  void callbackCameraInfo(const sensor_msgs::msg::CameraInfo::ConstPtr msg, const int sensor_id);
+  void callbackLaserScan(const sensor_msgs::msg::LaserScan::SharedPtr msg);
+  void callbackCameraInfo(const sensor_msgs::msg::CameraInfo::SharedPtr msg, const int sensor_id);
   bool loadFromFile(const std::string& filename);
   bool saveToFile(const std::string& filename);
 
 private:
-  ros::NodeHandle   nh_;
   std::atomic<bool> is_initialized_ = false;
 
   // | -------------------- topic subscribers ------------------- |
 
-  mrs_lib::SubscribeHandler<mrs_msgs::msg::ControlManagerDiagnostics> sh_control_manager_diag_;
-  mrs_lib::SubscribeHandler<mrs_msgs::msg::Float64Stamped>            sh_height_;
-  mrs_lib::SubscribeHandler<mrs_octomap_server::msg::PoseWithSize>    sh_clear_box_;
+  mrs_lib::SubscriberHandler<mrs_msgs::msg::ControlManagerDiagnostics> sh_control_manager_diag_;
+  mrs_lib::SubscriberHandler<mrs_msgs::msg::Float64Stamped>            sh_height_;
+  mrs_lib::SubscriberHandler<mrs_octomap_server::msg::PoseWithSize>    sh_clear_box_;
 
-  std::vector<mrs_lib::SubscribeHandler<sensor_msgs::msg::PointCloud2>> sh_3dlaser_pc2_;
-  std::vector<mrs_lib::SubscribeHandler<sensor_msgs::msg::PointCloud2>> sh_depth_cam_pc2_;
-  std::vector<mrs_lib::SubscribeHandler<sensor_msgs::msg::CameraInfo>>  sh_depth_cam_info_;
-  std::vector<mrs_lib::SubscribeHandler<sensor_msgs::msg::LaserScan>>   sh_laser_scan_;
+  std::vector<mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>> sh_3dlaser_pc2_;
+  std::vector<mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>> sh_depth_cam_pc2_;
+  std::vector<mrs_lib::SubscriberHandler<sensor_msgs::msg::CameraInfo>>  sh_depth_cam_info_;
+  std::vector<mrs_lib::SubscriberHandler<sensor_msgs::msg::LaserScan>>   sh_laser_scan_;
 
   // | ----------------------- publishers ----------------------- |
 
-  ros::Publisher pub_map_global_full_;
-  ros::Publisher pub_map_global_binary_;
-
-  ros::Publisher pub_map_local_full_;
-  ros::Publisher pub_map_local_binary_;
+  rclcpp::Node::Publisher<octomap_msgs::msg::Octomap>::SharedPtr pub_map_global_full_;
+  rclcpp::Node::Publisher<octomap_msgs::msg::Octomap>::SharedPtr pub_map_global_binary_;
+  rclcpp::Node::Publisher<octomap_msgs::msg::Octomap>::SharedPtr pub_map_local_full_;
+  rclcpp::Node::Publisher<octomap_msgs::msg::Octomap>::SharedPtr pub_map_local_binary_;
 
   // | -------------------- service serviers -------------------- |
 
-  ros::ServiceServer ss_reset_map_;
-  ros::ServiceServer ss_save_map_;
-  ros::ServiceServer ss_load_map_;
+  rclcpp::Service<std_srvs::srv::Triger>::SharedPtr ss_reset_map_;
+  rclcpp::Service<std_srvs::srv::Triger>::SharedPtr ss_save_map_;
+  rclcpp::Service<std_srvs::srv::Triger>::SharedPtr ss_load_map_;
 
+
+  
   // | ------------------------- timers ------------------------- |
 
   ros::Timer timer_global_map_publisher_;
@@ -598,41 +593,39 @@ void OctomapServer::onInit() {
 
   /* publishers //{ */
 
-  pub_map_global_full_   = nh_.advertise<octomap_msgs::msg::Octomap>("octomap_global_full_out", 1);
-  pub_map_global_binary_ = nh_.advertise<octomap_msgs::msg::Octomap>("octomap_global_binary_out", 1);
-
-  pub_map_local_full_   = nh_.advertise<octomap_msgs::msg::Octomap>("octomap_local_full_out", 1);
-  pub_map_local_binary_ = nh_.advertise<octomap_msgs::msg::Octomap>("octomap_local_binary_out", 1);
+  pub_map_global_full_   = node->create_publisher<octomap_msgs::msg::Octomap>("octomap_global_full_out", 1);
+  pub_map_global_binary_ = node->create_publisher<octomap_msgs::msg::Octomap>("octomap_global_binary_out", 1);  
+  pub_map_local_full_   = node->create_publisher<octomap_msgs::msg::Octomap>("octomap_local_full_out", 1);
+  pub_map_local_binary_ = node->create_publisher<octomap_msgs::msg::Octomap>("octomap_local_binary_out", 1);
+-
 
   //}
 
   /* subscribers //{ */
 
-  mrs_lib::SubscribeHandlerOptions shopts;
-  shopts.nh                 = nh_;
-  shopts.node_name          = "OctomapServer";
+  mrs_lib::SubscriberHandlerOptions shopts(node);
+  shopts.node_name = "OctomapServer";
   shopts.no_message_timeout = mrs_lib::no_timeout;
   shopts.threadsafe         = true;
   shopts.autostart          = true;
-  shopts.queue_size         = 1;
-  shopts.transport_hints    = ros::TransportHints().tcpNoDelay();
 
-  sh_control_manager_diag_ = mrs_lib::SubscribeHandler<mrs_msgs::msg::ControlManagerDiagnostics>(shopts, "control_manager_diagnostics_in");
-  sh_height_               = mrs_lib::SubscribeHandler<mrs_msgs::msg::Float64Stamped>(shopts, "height_in");
-  sh_clear_box_            = mrs_lib::SubscribeHandler<mrs_octomap_server::PoseWithSize>(shopts, "clear_box_in");
+
+  sh_control_manager_diag_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::ControlManagerDiagnostics>(shopts, "control_manager_diagnostics_in");
+  sh_height_               = mrs_lib::SubscriberHandler<mrs_msgs::msg::Float64Stamped>(shopts, "height_in");
+  sh_clear_box_            = mrs_lib::SubscriberHandler<mrs_octomap_server::PoseWithSize>(shopts, "clear_box_in");
 
   for (int i = 0; i < n_sensors_3d_lidar_; i++) {
 
     std::stringstream ss;
     ss << "lidar_3d_" << i << "_in";
 
-    sh_3dlaser_pc2_.push_back(mrs_lib::SubscribeHandler<sensor_msgs::msg::PointCloud2>(
+    sh_3dlaser_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(
         shopts, ss.str(), ros::Duration(2.0), std::bind(&OctomapServer::callback3dLidarCloud2, this, std::placeholders::_1, LIDAR_3D, i, ss.str(), false)));
 
     std::stringstream ss2;
     ss2 << "lidar_3d_" << i << "_over_max_range_in";
 
-    sh_3dlaser_pc2_.push_back(mrs_lib::SubscribeHandler<sensor_msgs::msg::PointCloud2>(
+    sh_3dlaser_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(
         shopts, ss2.str(), ros::Duration(2.0), std::bind(&OctomapServer::callback3dLidarCloud2, this, std::placeholders::_1, LIDAR_3D, i, ss.str(), true)));
   }
 
@@ -641,13 +634,13 @@ void OctomapServer::onInit() {
     std::stringstream ss;
     ss << "depth_camera_" << i << "_in";
 
-    sh_depth_cam_pc2_.push_back(mrs_lib::SubscribeHandler<sensor_msgs::msg::PointCloud2>(
+    sh_depth_cam_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(
         shopts, ss.str(), ros::Duration(2.0), std::bind(&OctomapServer::callback3dLidarCloud2, this, std::placeholders::_1, DEPTH_CAMERA, i, ss.str(), false)));
 
     std::stringstream ss2;
     ss2 << "depth_camera_" << i << "_over_max_range_in";
 
-    sh_depth_cam_pc2_.push_back(mrs_lib::SubscribeHandler<sensor_msgs::msg::PointCloud2>(
+    sh_depth_cam_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(
         shopts, ss2.str(), ros::Duration(2.0), std::bind(&OctomapServer::callback3dLidarCloud2, this, std::placeholders::_1, DEPTH_CAMERA, i, ss.str(), true)));
   }
 
@@ -656,7 +649,7 @@ void OctomapServer::onInit() {
     std::stringstream ss;
     ss << "camera_info_" << i << "_in";
 
-    sh_depth_cam_info_.push_back(mrs_lib::SubscribeHandler<sensor_msgs::msg::CameraInfo>(
+    sh_depth_cam_info_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::CameraInfo>(
         shopts, ss.str(), ros::Duration(2.0), std::bind(&OctomapServer::callbackCameraInfo, this, std::placeholders::_1, i)));
   }
 
@@ -664,9 +657,18 @@ void OctomapServer::onInit() {
 
   /* service servers //{ */
 
-  ss_reset_map_ = nh_.advertiseService("reset_map_in", &OctomapServer::callbackResetMap, this);
-  ss_save_map_  = nh_.advertiseService("save_map_in", &OctomapServer::callbackSaveMap, this);
-  ss_load_map_  = nh_.advertiseService("load_map_in", &OctomapServer::callbackLoadMap, this);
+  ss_reset_map_ = this->create_service<std_srvs::srv::Trigger>(
+            "reset_map_in",
+            std::bind(&OctomapServer::callbackResetMap, this,
+                      std::placeholders::_1, std::placeholders::_2));
+  ss_save_map_ = this->create_service<std_srvs::srv::Trigger>(
+            "save_map_in",
+            std::bind(&OctomapServer::callbackSaveMap, this,
+                      std::placeholders::_1, std::placeholders::_2));
+  ss_load_map_ = this->create_service<std_srvs::srv::Trigger>(
+            "load_map_in",
+            std::bind(&OctomapServer::callbackLoadMap, this,
+                      std::placeholders::_1, std::placeholders::_2));   
 
   //}
 
@@ -700,7 +702,7 @@ void OctomapServer::onInit() {
 
   is_initialized_ = true;
 
-  ROS_INFO("[%s]: Initialized", ros::this_node::getName().c_str());
+  RCLCPP_INFO(this->get_logger(),": Initialized");
 }
 
 //}
@@ -709,7 +711,7 @@ void OctomapServer::onInit() {
 
 /* callbackCameraInfo() //{ */
 
-void OctomapServer::callbackCameraInfo(const sensor_msgs::msg::CameraInfo::ConstPtr msg, const int sensor_id) {
+void OctomapServer::callbackCameraInfo(const sensor_msgs::msg::CameraInfo::SharedPtr msg, const int sensor_id) {
 
   if (!is_initialized_) {
     return;
@@ -725,6 +727,7 @@ void OctomapServer::callbackCameraInfo(const sensor_msgs::msg::CameraInfo::Const
   sensor_params_depth_cam_[sensor_id].vertical_fov   = 2 * atan(msg->height / (2 * msg->K[4]));
 
   ROS_INFO(
+    this->get_logger(),
       "[OctomapServer]: Changing sensor params based on camera_info for depth camera %d to %d horizontal rays, %d vertical rays, %.3f horizontal FOV, %.3f "
       "vertical FOV.",
       (int)sensor_id, sensor_params_depth_cam_[sensor_id].horizontal_rays, sensor_params_depth_cam_[sensor_id].vertical_rays,
@@ -739,7 +742,7 @@ void OctomapServer::callbackCameraInfo(const sensor_msgs::msg::CameraInfo::Const
 
 /* callbackLaserScan() //{ */
 
-void OctomapServer::callbackLaserScan(const sensor_msgs::msg::LaserScan::ConstPtr msg) {
+void OctomapServer::callbackLaserScan(const sensor_msgs::msg::LaserScan::SharedPtr msg) {
 
   if (!is_initialized_) {
     return;
@@ -753,21 +756,21 @@ void OctomapServer::callbackLaserScan(const sensor_msgs::msg::LaserScan::ConstPt
 
     if (!sh_control_manager_diag_.hasMsg()) {
 
-      ROS_WARN_THROTTLE(1.0, "[OctomapServer]: missing control manager diagnostics, can not integrate data!");
+      RCLCPP_WARN_THROTTLE(this->get_logger(),this->get_clock(),1000, "[OctomapServer]: missing control manager diagnostics, can not integrate data!");
       return;
 
     } else {
 
-      ros::Time last_time = sh_control_manager_diag_.lastMsgTime();
+      ros::Time last_time = sh_control_manager_diag_.lastMsgTime();  //need modifications
 
       if ((ros::Time::now() - last_time).toSec() > 1.0) {
-        ROS_WARN_THROTTLE(1.0, "[OctomapServer]: control manager diagnostics too old, can not integrate data!");
+        RCLCPP_WARN_THROTTLE(this->get_logger(),this->get_clock(),1000, "[OctomapServer]: control manager diagnostics too old, can not integrate data!");
         return;
       }
 
       // TODO is this the best option?
       if (!sh_control_manager_diag_.getMsg()->flying_normally) {
-        ROS_INFO_THROTTLE(1.0, "[OctomapServer]: not flying normally, therefore, not integrating data");
+        RCLCPP_WARN_THROTTLE(this->get_logger(),this->get_clock(),1000, "[OctomapServer]: not flying normally, therefore, not integrating data");
         return;
       }
     }
@@ -784,7 +787,7 @@ void OctomapServer::callbackLaserScan(const sensor_msgs::msg::LaserScan::ConstPt
   auto res = transformer_->getTransform(scan->header.frame_id, _world_frame_, scan->header.stamp);
 
   if (!res) {
-    ROS_WARN_THROTTLE(1.0, "[OctomapServer]: insertLaserScanCallback(): could not find tf from %s to %s", scan->header.frame_id.c_str(), _world_frame_.c_str());
+    RCLCPP_WARN_THROTTLE(this->get_logger(),this->get_clock(),1000, "[OctomapServer]: insertLaserScanCallback(): could not find tf from %s to %s", scan->header.frame_id.c_str(), _world_frame_.c_str());
     return;
   }
 
@@ -835,7 +838,7 @@ void OctomapServer::callbackLaserScan(const sensor_msgs::msg::LaserScan::ConstPt
 
 /* callback3dLidarCloud2() //{ */
 
-void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::ConstPtr msg, const SensorType_t sensor_type, const int sensor_id,
+void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::SharedPtr msg, const SensorType_t sensor_type, const int sensor_id,
                                           const std::string topic, const bool pcl_over_max_range) {
 
   if (!is_initialized_) {
@@ -847,7 +850,7 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
   }
 
   if (sensor_type == DEPTH_CAMERA && !vec_camera_info_processed_.at(sensor_id)) {
-    ROS_WARN_THROTTLE(1.0, "[OctomapServer]: Received data for depth camera %d but no camera info received yet.", sensor_id);
+    RCLCPP_WARN_THROTTLE(this->get_logger(),this->get_clock(),1000, "[OctomapServer]: Received data for depth camera %d but no camera info received yet.", sensor_id);
     return;
   }
 
@@ -855,7 +858,7 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
 
     if (!sh_control_manager_diag_.hasMsg()) {
 
-      ROS_WARN_THROTTLE(1.0, "[OctomapServer]: missing control manager diagnostics, can not integrate data!");
+      RCLCPP_WARN_THROTTLE(this->get_logger(),this->get_clock(),1000, "[OctomapServer]: missing control manager diagnostics, can not integrate data!");
       return;
 
     } else {
@@ -863,7 +866,7 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
       ros::Time last_time = sh_control_manager_diag_.lastMsgTime();
 
       if ((ros::Time::now() - last_time).toSec() > 1.0) {
-        ROS_WARN_THROTTLE(1.0, "[OctomapServer]: control manager diagnostics too old, can not integrate data!");
+        RCLCPP_WARN_THROTTLE(this->get_logger(),this->get_clock(),1000, "[OctomapServer]: control manager diagnostics too old, can not integrate data!");
         return;
       }
 
@@ -888,7 +891,7 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
   auto res = transformer_->getTransform(cloud->header.frame_id, _world_frame_, cloud->header.stamp);
 
   if (!res) {
-    ROS_WARN_THROTTLE(1.0, "[OctomapServer]: callback3dLidarCloud2(): could not find tf from %s to %s", cloud->header.frame_id.c_str(), _world_frame_.c_str());
+    RCLCPP_WARN_THROTTLE(this->get_logger(),this->get_clock(),1000, "[OctomapServer]: callback3dLidarCloud2(): could not find tf from %s to %s", cloud->header.frame_id.c_str(), _world_frame_.c_str());
     return;
   }
 
@@ -1106,13 +1109,13 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
 
 /* callbackLoadMap() //{ */
 
-bool OctomapServer::callbackLoadMap([[maybe_unused]] mrs_msgs::msg::String::Request& req, [[maybe_unused]] mrs_msgs::msg::String::Response& res) {
+bool OctomapServer::callbackLoadMap([[maybe_unused]] std::shared_ptr<mrs_msgs::msg::String::Request> req, [[maybe_unused]] std::shared_ptr<mrs_msgs::msg::String::Response> res) {
 
   if (!is_initialized_) {
     return false;
   }
 
-  ROS_INFO("[OctomapServer]: loading map");
+  RCLCPP_INFO(this->get_logger(),"[OctomapServer]: loading map");
 
   bool success = loadFromFile(req.value);
 
@@ -1140,7 +1143,7 @@ bool OctomapServer::callbackLoadMap([[maybe_unused]] mrs_msgs::msg::String::Requ
 
 /* callbackSaveMap() //{ */
 
-bool OctomapServer::callbackSaveMap([[maybe_unused]] mrs_msgs::msg::String::Request& req, [[maybe_unused]] mrs_msgs::msg::String::Response& res) {
+bool OctomapServer::callbackSaveMap([[maybe_unused]] std::shared_ptr<msg::String::Request> req, [[maybe_unused]] std::shared_ptr<msg::String::Response> res) {
 
   if (!is_initialized_) {
     return false;
@@ -1166,7 +1169,7 @@ bool OctomapServer::callbackSaveMap([[maybe_unused]] mrs_msgs::msg::String::Requ
 
 /* callbackResetMap() //{ */
 
-bool OctomapServer::callbackResetMap([[maybe_unused]] std_srvs::Empty::Request& req, [[maybe_unused]] std_srvs::Empty::Response& resp) {
+bool OctomapServer::callbackResetMap([[maybe_unused]] sd::shared_ptr<std_srvs::Empty::Request> req, [[maybe_unused]] std::shared_ptr<std_srvs::Empty::Response> resp) {
 
   {
     std::scoped_lock lock(mutex_octree_global_, mutex_octree_local_);
@@ -1177,7 +1180,7 @@ bool OctomapServer::callbackResetMap([[maybe_unused]] std_srvs::Empty::Request& 
 
   octrees_initialized_ = true;
 
-  ROS_INFO("[OctomapServer]: octomap cleared");
+  RCLCPP_INFO(this->get_logger(),"[OctomapServer]: octomap cleared");
 
   return true;
 }
@@ -1468,7 +1471,7 @@ void OctomapServer::timerPersistency([[maybe_unused]] const ros::TimerEvent& evt
 
   if (!sh_control_manager_diag_.hasMsg()) {
 
-    ROS_WARN_THROTTLE(1.0, "[OctomapServer]: missing control manager diagnostics, won't save the map automatically!");
+    RCLCPP_WARN_THROTTLE(this->get_logger(),this->get_clock(),1000, "[OctomapServer]: missing control manager diagnostics, won't save the map automatically!");
     return;
 
   } else {
@@ -1476,7 +1479,7 @@ void OctomapServer::timerPersistency([[maybe_unused]] const ros::TimerEvent& evt
     ros::Time last_time = sh_control_manager_diag_.lastMsgTime();
 
     if ((ros::Time::now() - last_time).toSec() > 1.0) {
-      ROS_WARN_THROTTLE(1.0, "[OctomapServer]: control manager diagnostics too old, won't save the map automatically!");
+      RCLCPP_WARN_THROTTLE(this->get_logger(),this->get_clock(),1000, "[OctomapServer]: control manager diagnostics too old, won't save the map automatically!");
       return;
     }
   }
@@ -1513,7 +1516,7 @@ void OctomapServer::timerAltitudeAlignment([[maybe_unused]] const ros::TimerEven
 
   if (!sh_control_manager_diag_.hasMsg()) {
 
-    ROS_WARN_THROTTLE(1.0, "[OctomapServer]: missing control manager diagnostics, won't save the map automatically!");
+    RCLCPP_WARN_THROTTLE(this->get_logger(),this->get_clock(),1000, "[OctomapServer]: missing control manager diagnostics, won't save the map automatically!");
     return;
 
   } else {
@@ -1521,7 +1524,7 @@ void OctomapServer::timerAltitudeAlignment([[maybe_unused]] const ros::TimerEven
     ros::Time last_time = sh_control_manager_diag_.lastMsgTime();
 
     if ((ros::Time::now() - last_time).toSec() > 1.0) {
-      ROS_WARN_THROTTLE(1.0, "[OctomapServer]: control manager diagnostics too old, won't save the map automatically!");
+      RCLCPP_WARN_THROTTLE(this->get_logger(),this->get_clock(),1000, "[OctomapServer]: control manager diagnostics too old, won't save the map automatically!");
       return;
     }
   }
@@ -1599,7 +1602,7 @@ void OctomapServer::timerAltitudeAlignment([[maybe_unused]] const ros::TimerEven
 
   if (!ground_z) {
 
-    ROS_WARN_THROTTLE(1.0, "[OctomapServer]: could not calculate the Z of the ground below");
+    RCLCPP_WARN_THROTTLE(this->get_logger(),this->get_clock(),1000, "[OctomapServer]: could not calculate the Z of the ground below");
 
     {
       std::scoped_lock lock(mutex_octree_global_, mutex_octree_local_);
@@ -1640,7 +1643,6 @@ void OctomapServer::timerAltitudeAlignment([[maybe_unused]] const ros::TimerEven
 }
 
 //}
-
 // | ------------------------ routines ------------------------ |
 
 /* insertPointCloud() //{ */
@@ -1847,11 +1849,11 @@ void OctomapServer::insertPointCloud(const geometry_msgs::msg::Vector3& sensorOr
             }
           }
         } else {
-          ROS_WARN_THROTTLE(1.0, "[OctomapServer]: Unable to transform the pose to be cleared from frame %s to frame %s.", pws.header.frame_id.c_str(),
+          RCLCPP_WARN_THROTTLE(this->get_logger(),this->get_clock(),1000, "[OctomapServer]: Unable to transform the pose to be cleared from frame %s to frame %s.", pws.header.frame_id.c_str(),
                             _world_frame_.c_str());
         }
       } else {
-        ROS_WARN_THROTTLE(1.0, "[OctomapServer]: Latest pose from clear_box is too old - diff from now: %.3f", (ros::Time::now() - pws.header.stamp).toSec());
+        RCLCPP_WARN_THROTTLE(this->get_logger(),this->get_clock(),1000, "[OctomapServer]: Latest pose from clear_box is too old - diff from now: %.3f", (ros::Time::now() - pws.header.stamp).toSec());
       }
     }
   }
@@ -2295,11 +2297,11 @@ bool OctomapServer::translateMap(std::shared_ptr<OcTree_t>& octree, const double
 
 /* timeoutGeneric() */ /*//{*/
 void OctomapServer::timeoutGeneric(const std::string& topic, const ros::Time& last_msg, [[maybe_unused]] const int n_pubs) {
-  ROS_WARN_THROTTLE(1.0, "[OctomapServer]: not receiving '%s' for %.3f s", topic.c_str(), (ros::Time::now() - last_msg).toSec());
+  RCLCPP_WARN_THROTTLE(this->get_logger(),this->get_clock(),1000, "[OctomapServer]: not receiving '%s' for %.3f s", topic.c_str(), (ros::Time::now() - last_msg).toSec());
 }
 /*//}*/
 
 }  // namespace mrs_octomap_server
 
-#include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(mrs_octomap_server::OctomapServer, nodelet::Nodelet)
+#include <rclcpp_components/register_node_macro.hpp>
+RCLCPP_COMONENTS_REGISTER_NODE(mrs_octomap_server::OctomapServer)
