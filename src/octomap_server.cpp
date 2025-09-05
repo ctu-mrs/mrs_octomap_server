@@ -558,10 +558,10 @@ void OctomapServer::onInit() {
     bool success = loadFromFile(_persistency_map_name_);
 
     if (success) {
-      ROS_INFO("[OctomapServer]: loaded persistency map");
+      RCLCPP_INFO(this->get_logger,"loaded persistency map");
     } else {
 
-      ROS_ERROR("[OctomapServer]: failed to load the persistency map, turning persistency off");
+      RCLCPP_ERROR(this->get_logger(),"failed to load the persistency map, turning persistency off");
 
       _persistency_enabled_ = false;
     }
@@ -579,7 +579,7 @@ void OctomapServer::onInit() {
 
   transformer_ = std::make_unique<mrs_lib::Transformer>("OctomapServer");
   transformer_->setDefaultPrefix(_uav_name_);
-  transformer_->setLookupTimeout(ros::Duration(0.5));
+  transformer_->setLookupTimeout(rclcpp::Duration::from_seconds(0.5));
   transformer_->retryLookupNewest(false);
 
   //}
@@ -610,15 +610,16 @@ void OctomapServer::onInit() {
 
     std::stringstream ss;
     ss << "lidar_3d_" << i << "_in";
-
     sh_3dlaser_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(
-        shopts, ss.str(), ros::Duration(2.0), std::bind(&OctomapServer::callback3dLidarCloud2, this, std::placeholders::_1, LIDAR_3D, i, ss.str(), false)));
+    shopts, ss.str(), rclcpp::Duration::from_seconds(2.0),
+    std::bind(&OctomapServer::callback3dLidarCloud2, this, std::placeholders::_1, LIDAR_3D, i, ss.str(), false)));
+
 
     std::stringstream ss2;
     ss2 << "lidar_3d_" << i << "_over_max_range_in";
 
     sh_3dlaser_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(
-        shopts, ss2.str(), ros::Duration(2.0), std::bind(&OctomapServer::callback3dLidarCloud2, this, std::placeholders::_1, LIDAR_3D, i, ss.str(), true)));
+        shopts, ss2.str(), rclcpp::Duration::from_seconds(2.0), std::bind(&OctomapServer::callback3dLidarCloud2, this, std::placeholders::_1, LIDAR_3D, i, ss.str(), true)));
   }
 
   for (int i = 0; i < n_sensors_depth_cam_; i++) {
@@ -627,13 +628,13 @@ void OctomapServer::onInit() {
     ss << "depth_camera_" << i << "_in";
 
     sh_depth_cam_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(
-        shopts, ss.str(), ros::Duration(2.0), std::bind(&OctomapServer::callback3dLidarCloud2, this, std::placeholders::_1, DEPTH_CAMERA, i, ss.str(), false)));
+        shopts, ss.str(), rclcpp::Duration::from_seconds(2.0), std::bind(&OctomapServer::callback3dLidarCloud2, this, std::placeholders::_1, DEPTH_CAMERA, i, ss.str(), false)));
 
     std::stringstream ss2;
     ss2 << "depth_camera_" << i << "_over_max_range_in";
 
     sh_depth_cam_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(
-        shopts, ss2.str(), ros::Duration(2.0), std::bind(&OctomapServer::callback3dLidarCloud2, this, std::placeholders::_1, DEPTH_CAMERA, i, ss.str(), true)));
+        shopts, ss2.str(), rclcpp::Duration::from_seonds(2.0), std::bind(&OctomapServer::callback3dLidarCloud2, this, std::placeholders::_1, DEPTH_CAMERA, i, ss.str(), true)));
   }
 
   for (int i = 0; i < n_sensors_depth_cam_; i++) {
@@ -642,7 +643,7 @@ void OctomapServer::onInit() {
     ss << "camera_info_" << i << "_in";
 
     sh_depth_cam_info_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::CameraInfo>(
-        shopts, ss.str(), ros::Duration(2.0), std::bind(&OctomapServer::callbackCameraInfo, this, std::placeholders::_1, i)));
+        shopts, ss.str(), rclcpp::Duration::from_seconds(2.0), std::bind(&OctomapServer::callbackCameraInfo, this, std::placeholders::_1, i)));
   }
 
   //}
