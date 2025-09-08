@@ -1176,7 +1176,7 @@ bool OctomapServer::callbackSaveMap([[maybe_unused]] std::shared_ptr<mrs_msgs::m
 
 /* callbackResetMap() //{ */
 
-bool OctomapServer::callbackResetMap([[maybe_unused]] sd::shared_ptr<std_srvs::srv::Empty::Request> req, [[maybe_unused]] std::shared_ptr<std_srvs::srv::Empty::Response> resp) {
+bool OctomapServer::callbackResetMap([[maybe_unused]] std::shared_ptr<std_srvs::srv::Empty::Request> req, [[maybe_unused]] std::shared_ptr<std_srvs::srv::Empty::Response> resp) {
 
   {
     std::scoped_lock lock(mutex_octree_global_, mutex_octree_local_);
