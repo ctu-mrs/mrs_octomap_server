@@ -43,10 +43,14 @@ include_directories(
 )
 
 # Server library
-add_library(MrsOctomapServer_Server
+add_library(MrsOctomapServer_Server SHARED
   src/octomap_server.cpp
   src/conversions.cpp
 )
+
+
+target_compile_definitions(MrsOctomapServer_Server
+  PRIVATE "COMPOSITION_BUILDING_DLL")
 
 ament_target_dependencies(MrsOctomapServer_Server
   Eigen3
@@ -73,6 +77,10 @@ target_include_directories(MrsOctomapServer_Server PUBLIC
   ${PCL_INCLUDE_DIRS}
 )
 
+#from exemple https://github.com/ros2/demos/blob/jazzy/composition/CMakeLists.txt
+rclcpp_components_register_nodes(MrsOctomapServer_Server "composition::Server")
+set(node_plugins "${node_plugins}composition::Server;$<TARGET_FILE:MrsOctomapServer_Server>\n")
+
 target_link_libraries(MrsOctomapServer_Server
   ${PCL_LIBRARIES}
   ${OCTOMAP_LIBRARIES}
@@ -93,5 +101,7 @@ install(DIRECTORY launch config
 ament_export_include_directories(include)
 ament_export_libraries(${LIBRARIES})
 ament_export_dependencies(Eigen3 octomap PCL)
+
+
 
 ament_package()
