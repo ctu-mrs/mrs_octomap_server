@@ -11,6 +11,7 @@
   <license>BSD 3-Clause</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_ros</buildtool_depend>
 
   <depend>geometry_msgs</depend>
   <depend>laser_geometry</depend>
@@ -22,7 +23,6 @@
   <depend>pcl_conversions</depend>
   <depend>pcl_msgs</depend>
   <depend>pcl_ros</depend>
-  <depend>roscpp</depend>
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
   <depend>std_srvs</depend>
@@ -32,13 +32,13 @@
   <exec_depend>rosidl_default_runtime</exec_depend>
   <member_of_group>rosidl_interface_packages</member_of_group>
 
-  <test_depend>ament_lint_auto</test_depend>
-  <test_depend>ament_lint_common</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>
   </export>
-
+  <exec_depend>libpcl-all</exec_depend>
+  <exec_depend>liboctomap</exec_depend>
+  <exec_depend>libeigen3-dev</exec_depend>
 
 
 </package>
