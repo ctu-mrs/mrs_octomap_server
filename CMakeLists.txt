@@ -15,6 +15,26 @@ add_compile_options(-O3 -DOCTOMAP_NODEBUGOUT)
 #set(USE_ROS_TIMER 0)
 set(USE_ROS_TIMER 1)
 
+
+if(${USE_ROS_TIMER})
+  MESSAGE(WARNING "[mrs_uav_autostart]: Compiling with ROS Timers. This can cause high CPU load in runtime.")
+endif()
+
+# set the compile options to show code warnings
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra)
+endif()
+
+if(ENABLE_COVERAGE)
+  message(WARNING "building for coverage, the performance might be limited")
+
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --coverage -fprofile-arcs")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage -fprofile-arcs")
+
+  add_definitions("-O1")
+  add_definitions("-g")
+endif()
+
 # Find dependencies
 set(DEPENDENCIES
   ament_cmake
@@ -22,11 +42,11 @@ set(DEPENDENCIES
   rclcpp_components
   Eigen3
   OpenMP
-  rosidl_default_generators
   sensor_msgs
   std_srvs
   std_msgs
   geometry_msgs
+  tf2_geometry_msgs
   laser_geometry
   mrs_lib
   mrs_msgs
@@ -35,7 +55,7 @@ set(DEPENDENCIES
   octomap_ros
   pcl_conversions
   pcl_msgs
-  pcl_ros
+  mrs_modules_msgs
   )
 
 set(LIBRARIES
@@ -47,18 +67,14 @@ foreach(DEP IN LISTS DEPENDENCIES)
   find_package(${DEP} REQUIRED)
 endforeach()
 
-# Messages (ROS2)
-rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/PoseWithSize.msg"
-  DEPENDENCIES std_msgs geometry_msgs
-)
-
 include_directories(
   include
   ${rclcpp_INCLUDE_DIRS}
   ${mrs_lib_INCLUDE_DIRS}
   ${mrs_uav_testing_INCLUDE_DIRS}
   )
+
+
 
 
 ## --------------------------------------------------------------
@@ -70,16 +86,19 @@ add_library(MrsOctomapServer_Server SHARED
   src/conversions.cpp
 )
 
+## a voir
 target_link_libraries(MrsOctomapServer_Server
   ${PCL_LIBRARIES}
   ${OCTOMAP_LIBRARIES}
   OpenMP::OpenMP_CXX
-
+)
 
 ament_target_dependencies(MrsOctomapServer_Server
   ${DEPENDENCIES}
   )
 
+
+## components
 rclcpp_components_register_nodes(MrsOctomapServer_Server PLUGIN "mrs_octomap_server::octomapServer::OctomapServer" EXECUTABLE MrsOctomapServer_Server)
 
 target_compile_definitions(MrsOctomapServer_Server PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
@@ -87,7 +106,7 @@ target_compile_definitions(MrsOctomapServer_Server PRIVATE USE_ROS_TIMER=${USE_R
 ## --------------------------------------------------------------
 ## |                           install                          |
 ## --------------------------------------------------------------
-)
+
 
 ament_export_libraries(
   ${LIBRARIES}

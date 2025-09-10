@@ -1,24 +1,30 @@
 /* includes //{ */
 
 
-#include "composition/octomap_server.hpp"
-
+// Octomap (inchangé)
 #include <octomap/OcTreeNode.h>
 #include <octomap/octomap.h>
 #include <octomap/OcTreeKey.h>
 
-#include <geometry_msgs/msg/Vector3.hpp>
-#include <geometry_msgs/msg/Points.hpp>
+// Messages ROS2
+#include <geometry_msgs/msg/vector3.hpp>
+#include <geometry_msgs/msg/point.hpp>
+#include <geometry_msgs/msg/pose_stamped.hpp>
 
-#include <laser_geometry/laser_geometry.h>
+//remplce laser_geometry
+#include <laser_geometry/laser_geometry.hpp>  
 
-#include <sensor_msgs/msg/PointCloud2.hpp>
-#include <sensor_msgs/msg/LaserScan.hpp>
-#include <sensor_msgs/msg/CameraInfo.hpp>
+// Messages de capteurs
+#include <sensor_msgs/msg/point_cloud2.hpp>
+#include <sensor_msgs/point_cloud2_iterator.hpp>
+#include <sensor_msgs/msg/laser_scan.hpp>
+#include <sensor_msgs/msg/camera_info.hpp>
 
-#include <std_srvs/srv/Empty.hpp>
-#include <std_srvs/srv/Trigger.hpp>
+// Services ROS2
+#include <std_srvs/srv/empty.hpp>
+#include <std_srvs/srv/trigger.hpp>
 
+// PCL
 #include <pcl/conversions.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl_conversions/pcl_conversions.h>
@@ -26,22 +32,36 @@
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/statistical_outlier_removal.h>
 
-#include <octomap_msgs/msg/BoundingBoxQueryRequest.h>
+// pcl_ros n'existe pas en ROS2, utilisez directement PCL et tf2 pour les transformations
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
+
+// Messages Octomap
+#include <octomap_msgs/srv/bounding_box_query.hpp>
+#include <octomap_msgs/conversions.h>
+
+// MRS Lib
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/transformer.h>
-#include <mrs_lib/subscribe_handler.h>
+#include <mrs_lib/subscriber_handler.h>
 #include <mrs_lib/mutex.h>
 #include <mrs_lib/scope_timer.h>
 
+// Messages personnalisés
+// #include <mrs_octomap_server/msg/PoseWithSize.hpp>
+#include <mrs_modules_msgs/msg/pose_with_size.h>
+//#include <mrs_modules_msgs/msg/PoseWithSize.hpp>
 
-#include <mrs_octomap_server/msg/PoseWithSize.hpp>
+
 #include <mrs_octomap_server/conversions.h>
 
+// Messages MRS
+#include <mrs_msgs/msg/control_manager_diagnostics.hpp>
+#include <mrs_msgs/msg/float64_stamped.hpp>
+#include <mrs_msgs/msg/string.hpp>
 
-#include <eigen3/Eigen/Eigen>
+// Eigen
 #include <Eigen/Geometry>
-
 
 #include <filesystem>
 
@@ -151,7 +171,7 @@ private:
 
   mrs_lib::SubscriberHandler<mrs_msgs::msg::ControlManagerDiagnostics> sh_control_manager_diag_;
   mrs_lib::SubscriberHandler<mrs_msgs::msg::Float64Stamped>            sh_height_;
-  mrs_lib::SubscriberHandler<mrs_octomap_server::msg::PoseWithSize>    sh_clear_box_;
+  mrs_lib::SubscriberHandler<mrs_modules_msgs::msg::PoseWithSize>    sh_clear_box_;
 
   std::vector<mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>> sh_3dlaser_pc2_;
   std::vector<mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>> sh_depth_cam_pc2_;
@@ -598,7 +618,7 @@ void OctomapServer::onInit(const rclcpp::NodeOptions& options) {
 
   sh_control_manager_diag_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::ControlManagerDiagnostics>(shopts, "~/control_manager_diagnostics_in");
   sh_height_               = mrs_lib::SubscriberHandler<mrs_msgs::msg::Float64Stamped>(shopts, "~/height_in");
-  sh_clear_box_            = mrs_lib::SubscriberHandler<mrs_octomap_server::PoseWithSize>(shopts, "~/clear_box_in");
+  sh_clear_box_            = mrs_lib::SubscriberHandler<mrs_modules_msgs::msg::PoseWithSize>(shopts, "~/clear_box_in");
 
   for (int i = 0; i < n_sensors_3d_lidar_; i++) {
 
@@ -1489,7 +1509,7 @@ void OctomapServer::timerPersistency() {
     }
   }
 
-  mrs_msgs::msg::ControlManagerDiagnosticsConstPtr control_manager_diag = sh_control_manager_diag_.getMsg();
+  mrs_msgs::msg::ControlManagerDiagnostics::ConstPtr control_manager_diag = sh_control_manager_diag_.getMsg();
 
   if (control_manager_diag->flying_normally) {
 
@@ -1827,7 +1847,7 @@ void OctomapServer::insertPointCloud(const geometry_msgs::msg::Vector3& sensorOr
   {
     // TODO mutex?
     if (sh_clear_box_.hasMsg()) {
-      mrs_octomap_server::PoseWithSize pws = *sh_clear_box_.getMsg();
+      mrs_modules_msgs::msg::PoseWithSize pws = *sh_clear_box_.getMsg();
       if ((this->now() - pws.header.stamp).toSec() < 1.0) {
         // transform the pose to octomap frame
         geometry_msgs::msg::PoseStamped pose_stamped;
