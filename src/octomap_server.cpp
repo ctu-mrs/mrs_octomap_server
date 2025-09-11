@@ -49,8 +49,7 @@
 
 // Messages personnalisés
 // #include <mrs_octomap_server/msg/PoseWithSize.hpp>
-#include <mrs_modules_msgs/msg/pose_with_size.h>
-//#include <mrs_modules_msgs/msg/PoseWithSize.hpp>
+#include <mrs_modules_msgs/msg/pose_with_size.hpp>
 
 
 #include <mrs_octomap_server/conversions.h>
@@ -58,10 +57,21 @@
 // Messages MRS
 #include <mrs_msgs/msg/control_manager_diagnostics.hpp>
 #include <mrs_msgs/msg/float64_stamped.hpp>
-#include <mrs_msgs/msg/string.hpp>
+#include <mrs_msgs/srv/string.hpp>
 
 // Eigen
 #include <Eigen/Geometry>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+#include <pcl/memory.h>
+
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2/LinearMath/Matrix3x3.h>
+
+
+
+
+
 
 #include <filesystem>
 
@@ -79,6 +89,8 @@ namespace octomapServer
 
 using vec3s_t = Eigen::Matrix<float, 3, -1>;
 using vec3_t  = Eigen::Vector3f;
+using PCLPointCloud = pcl::PointCloud<pcl::PointXYZ>;
+using PCLPointCloudPtr = PCLPointCloud::Ptr;
 
 struct xyz_lut_t
 {
@@ -148,10 +160,10 @@ class OctomapServer : public rclcpp::Node {
 public:
 
   OctomapServer(const rclcpp::NodeOptions& options);
-  virtual void onInit();
+  virtual void onInit(const rclcpp::NodeOptions& options);
 
-  bool callbackLoadMap(std::shared_ptr<mrs_msgs::msg::String::Request> req, [[maybe_unused]] std::shared_ptr<mrs_msgs::msg::String::Response> resp);
-  bool callbackSaveMap(std::shared_ptr<mrs_msgs::msg::String::Request> req, [[maybe_unused]] std::shared_ptr<mrs_msgs::msg::String::Response> resp);
+  bool callbackLoadMap(std::shared_ptr<mrs_msgs::srv::String::Request> req, [[maybe_unused]] std::shared_ptr<mrs_msgs::srv::String::Response> resp);
+  bool callbackSaveMap(std::shared_ptr<mrs_msgs::srv::String::Request> req, [[maybe_unused]] std::shared_ptr<mrs_msgs::srv::String::Response> resp);
 
   bool callbackResetMap(std::shared_ptr<std_srvs::srv::Empty::Request> req, std::shared_ptr<std_srvs::srv::Empty::Response> resp);
 
@@ -179,6 +191,7 @@ private:
   std::vector<mrs_lib::SubscriberHandler<sensor_msgs::msg::LaserScan>>   sh_laser_scan_;
 
   // | ----------------------- publishers ----------------------- |
+
 
   rclcpp::Publisher<octomap_msgs::msg::Octomap>::SharedPtr pub_map_global_full_;
   rclcpp::Publisher<octomap_msgs::msg::Octomap>::SharedPtr pub_map_global_binary_;
@@ -347,7 +360,7 @@ void OctomapServer::onInit(const rclcpp::NodeOptions& options) {
 
   /* params //{ */
 
-  mrs_lib::ParamLoader param_loader(this, this->getName());
+  mrs_lib::ParamLoader param_loader(shared_from_this(), this->get_name());
 
   param_loader.loadParam("simulation", _simulation_);
   param_loader.loadParam("uav_name", _uav_name_);
@@ -600,10 +613,10 @@ void OctomapServer::onInit(const rclcpp::NodeOptions& options) {
 
   /* publishers //{ */
 
-  pub_map_global_full_   = mrs_lib::PublisherHandler<octomap_msgs::msg::Octomap>(node_, "octomap_global_full_out");
-  pub_map_global_binary_ = mrs_lib::PublisherHandler<octomap_msgs::msg::Octomap>(node_, "octomap_global_binary_out");
-  pub_map_local_full_    = mrs_lib::PublisherHandler<octomap_msgs::msg::Octomap>(node_, "octomap_local_full_out");
-  pub_map_local_binary_  = mrs_lib::PublisherHandler<octomap_msgs::msg::Octomap>(node_, "octomap_local_binary_out");
+  pub_map_global_full_    = this->create_publisher<octomap_msgs::msg::Octomap>("octomap_global_full_out", 10);
+  pub_map_global_binary_  = this->create_publisher<octomap_msgs::msg::Octomap>("octomap_global_binary_out", 10);   
+  pub_map_local_full_     = this->create_publisher<octomap_msgs::msg::Octomap>("octomap_local_full_out", 10);   
+  pub_map_local_binary_   = this->create_publisher<octomap_msgs::msg::Octomap>("octomap_local_binary_out", 10);
 
   //}
 
@@ -749,8 +762,8 @@ void OctomapServer::callbackCameraInfo(const sensor_msgs::msg::CameraInfo::Share
 
   std::scoped_lock lock(mutex_lut_);
 
-  sensor_params_depth_cam_[sensor_id].horizontal_fov = 2 * atan(msg->width / (2 * msg->K[0]));
-  sensor_params_depth_cam_[sensor_id].vertical_fov   = 2 * atan(msg->height / (2 * msg->K[4]));
+  sensor_params_depth_cam_[sensor_id].horizontal_fov = 2 * atan(msg->width / (2 * msg->k[0]));
+  sensor_params_depth_cam_[sensor_id].vertical_fov   = 2 * atan(msg->height / (2 * msg->k[4]));
 
   RCLCPP_INFO(
     this->get_logger(),
@@ -789,7 +802,7 @@ void OctomapServer::callbackLaserScan(const sensor_msgs::msg::LaserScan::SharedP
 
       rclcpp::Time last_time = sh_control_manager_diag_.lastMsgTime();  //need modifications
 
-      if ((this->now() - last_time).toSec() > 1.0) {
+      if ((this->now() - last_time).seconds() > 1.0) {
         RCLCPP_WARN_THROTTLE(this->get_logger(),*this->get_clock(),1000, "control manager diagnostics too old, can not integrate data!");
         return;
       }
@@ -802,10 +815,10 @@ void OctomapServer::callbackLaserScan(const sensor_msgs::msg::LaserScan::SharedP
     }
   }
 
-  sensor_msgs::msg::LaserScanConstPtr scan = msg;
+  sensor_msgs::msg::LaserScan::ConstSharedPtr scan = msg;
 
-  PCLPointCloud::Ptr pc              = boost::make_shared<PCLPointCloud>();
-  PCLPointCloud::Ptr free_vectors_pc = boost::make_shared<PCLPointCloud>();
+  PCLPointCloud::Ptr pc              = pcl::make_shared<PCLPointCloud>();
+  PCLPointCloud::Ptr free_vectors_pc = pcl::make_shared<PCLPointCloud>();
 
   Eigen::Matrix4f                 sensorToWorld;
   geometry_msgs::msg::TransformStamped sensorToWorldTf;
@@ -817,7 +830,9 @@ void OctomapServer::callbackLaserScan(const sensor_msgs::msg::LaserScan::SharedP
     return;
   }
 
-  pcl_ros::transformAsMatrix(res.value().transform, sensorToWorld);
+  Eigen::Affine3d eigen_transform = octomap::transformToEigen(res.transform);
+  sensorToWorld = eigen_transform.matrix().cast<float>();
+
 
   // laser scan to point cloud
   sensor_msgs::msg::PointCloud2 ros_cloud;
@@ -891,7 +906,7 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::S
 
       rclcpp::Time last_time = sh_control_manager_diag_.lastMsgTime();
 
-      if ((this->now() - last_time).toSec() > 1.0) {
+      if ((this->now() - last_time).seconds() > 1.0) {
         RCLCPP_WARN_THROTTLE(this->get_logger(),*this->get_clock(),1000, "control manager diagnostics too old, can not integrate data!");
         return;
       }
@@ -903,13 +918,13 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::S
     }
   }
 
-  sensor_msgs::msg::PointCloud2ConstPtr cloud = msg;
+  sensor_msgs::msg::PointCloud2::ConstSharedPtr cloud = msg;
 
   rclcpp::Time time_start = this->now();
 
-  PCLPointCloud::Ptr pc              = boost::make_shared<PCLPointCloud>();
-  PCLPointCloud::Ptr free_vectors_pc = boost::make_shared<PCLPointCloud>();
-  PCLPointCloud::Ptr hit_pc          = boost::make_shared<PCLPointCloud>();
+  PCLPointCloud::Ptr pc              = pcl::make_shared<PCLPointCloud>();
+  PCLPointCloud::Ptr free_vectors_pc = pcl::make_shared<PCLPointCloud>();
+  PCLPointCloud::Ptr hit_pc          = pcl::make_shared<PCLPointCloud>();
 
   pcl::fromROSMsg(*cloud, *pc);
 
@@ -922,7 +937,10 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::S
 
   Eigen::Matrix4f                 sensorToWorld;
   geometry_msgs::msg::TransformStamped sensorToWorldTf = res.value();
-  pcl_ros::transformAsMatrix(sensorToWorldTf.transform, sensorToWorld);
+
+  Eigen::Affine3d eigen_transform = octomap::transformToEigen(res.transform);
+  sensorToWorld = eigen_transform.matrix().cast<float>();
+
 
   double max_range;
 
@@ -1119,7 +1137,7 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::S
 
     rclcpp::Time time_end = this->now();
 
-    double exec_duration = (time_end - time_start).toSec();
+    double exec_duration = (time_end - time_start).seconds();
 
     double coef               = 0.5;
     avg_time_cloud_insertion_ = coef * avg_time_cloud_insertion_ + (1.0 - coef) * exec_duration;
@@ -1134,7 +1152,7 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::S
 
 /* callbackLoadMap() //{ */
 
-bool OctomapServer::callbackLoadMap([[maybe_unused]] std::shared_ptr<mrs_msgs::msg::String::Request> req, [[maybe_unused]] std::shared_ptr<mrs_msgs::msg::String::Response> res) {
+bool OctomapServer::callbackLoadMap([[maybe_unused]] std::shared_ptr<mrs_msgs::srv::String::Request> req, [[maybe_unused]] std::shared_ptr<mrs_msgs::srv::String::Response> res) {
 
   if (!is_initialized_) {
     return false;
@@ -1168,7 +1186,7 @@ bool OctomapServer::callbackLoadMap([[maybe_unused]] std::shared_ptr<mrs_msgs::m
 
 /* callbackSaveMap() //{ */
 
-bool OctomapServer::callbackSaveMap([[maybe_unused]] std::shared_ptr<mrs_msgs::msg::String::Request> req, [[maybe_unused]] std::shared_ptr<mrs_msgs::msg::String::Response> res) {
+bool OctomapServer::callbackSaveMap([[maybe_unused]] std::shared_ptr<mrs_msgs::srv::String::Request> req, [[maybe_unused]] std::shared_ptr<mrs_msgs::srv::String::Response> res) {
 
   if (!is_initialized_) {
     return false;
@@ -1258,7 +1276,7 @@ void OctomapServer::timerGlobalMapPublisher() {
 
       mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer("OctomapServer::globalMapFullPublish", scope_timer_logger_, _scope_timer_enabled_);
 
-      success = octomap_msgs::msg::fullMapToMsg(*octree_global_, map);
+      success = octomap_msgs::fullMapToMsg(*octree_global_, map);
     }
 
     if (success) {
@@ -1395,7 +1413,7 @@ void OctomapServer::timerLocalMapPublisher() {
 
       mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer("OctomapServer::localMapFullPublish", scope_timer_logger_, _scope_timer_enabled_);
 
-      success = octomap_msgs::msg::fullMapToMsg(*octree_local_, map);
+      success = octomap_msgs::fullMapToMsg(*octree_local_, map);
     }
 
     if (success) {
@@ -1503,13 +1521,13 @@ void OctomapServer::timerPersistency() {
 
     rclcpp::Time last_time = sh_control_manager_diag_.lastMsgTime();
 
-    if ((this->now() - last_time).toSec() > 1.0) {
+    if ((this->now() - last_time).seconds() > 1.0) {
       RCLCPP_WARN_THROTTLE(this->get_logger(),*this->get_clock(),1000, "control manager diagnostics too old, won't save the map automatically!");
       return;
     }
   }
 
-  mrs_msgs::msg::ControlManagerDiagnostics::ConstPtr control_manager_diag = sh_control_manager_diag_.getMsg();
+  mrs_msgs::msg::ControlManagerDiagnostics::ConstSharedPtr control_manager_diag = sh_control_manager_diag_.getMsg();
 
   if (control_manager_diag->flying_normally) {
 
@@ -1548,13 +1566,13 @@ void OctomapServer::timerAltitudeAlignment() {
 
     rclcpp::Time last_time = sh_control_manager_diag_.lastMsgTime();
 
-    if ((this->now() - last_time).toSec() > 1.0) {
+    if ((this->now() - last_time).seconds() > 1.0) {
       RCLCPP_WARN_THROTTLE(this->get_logger(),*this->get_clock(),1000, "control manager diagnostics too old, won't save the map automatically!");
       return;
     }
   }
 
-  mrs_msgs::msg::ControlManagerDiagnosticsConstPtr control_manager_diag = sh_control_manager_diag_.getMsg();
+  mrs_msgs::msg::ControlManagerDiagnostics::ConstSharedPtr control_manager_diag = sh_control_manager_diag_.getMsg();
 
   // | -------------------- check for height -------------------- |
 
@@ -1564,7 +1582,7 @@ void OctomapServer::timerAltitudeAlignment() {
 
     rclcpp::Time last_time = sh_height_.lastMsgTime();
 
-    if ((this->now() - last_time).toSec() < 1.0) {
+    if ((this->now() - last_time).seconds() < 1.0) {
       got_height = true;
     }
   }
@@ -1848,7 +1866,7 @@ void OctomapServer::insertPointCloud(const geometry_msgs::msg::Vector3& sensorOr
     // TODO mutex?
     if (sh_clear_box_.hasMsg()) {
       mrs_modules_msgs::msg::PoseWithSize pws = *sh_clear_box_.getMsg();
-      if ((this->now() - pws.header.stamp).toSec() < 1.0) {
+      if ((this->now() - pws.header.stamp).seconds() < 1.0) {
         // transform the pose to octomap frame
         geometry_msgs::msg::PoseStamped pose_stamped;
         pose_stamped.header = pws.header;
@@ -1878,7 +1896,7 @@ void OctomapServer::insertPointCloud(const geometry_msgs::msg::Vector3& sensorOr
                             _world_frame_.c_str());
         }
       } else {
-        RCLCPP_WARN_THROTTLE(this->get_logger(),*this->get_clock(),1000, "Latest pose from clear_box is too old - diff from now: %.3f", (this->now() - pws.header.stamp).toSec());
+        RCLCPP_WARN_THROTTLE(this->get_logger(),*this->get_clock(),1000, "Latest pose from clear_box is too old - diff from now: %.3f", (this->now() - pws.header.stamp).seconds());
       }
     }
   }
@@ -1891,7 +1909,7 @@ void OctomapServer::insertPointCloud(const geometry_msgs::msg::Vector3& sensorOr
   {
     std::scoped_lock lock(mutex_local_map_duty_);
 
-    local_map_duty_ += (time_end - time_start).toSec();
+    local_map_duty_ += (time_end - time_start).seconds();
   }
 }
 

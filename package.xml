@@ -29,7 +29,7 @@
   <depend>std_srvs</depend>
   <depend>tf2_geometry_msgs</depend>
   <depend>rclcpp_components</depend>
-  <depend>mrs_module_msgs</depend>
+  <depend>mrs_modules_msgs</depend>
 
 
 

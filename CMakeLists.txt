@@ -53,8 +53,10 @@ set(DEPENDENCIES
   octomap
   octomap_msgs
   octomap_ros
+  PCL
   pcl_conversions
   pcl_msgs
+  pcl_ros
   mrs_modules_msgs
   )
 
@@ -72,6 +74,8 @@ include_directories(
   ${rclcpp_INCLUDE_DIRS}
   ${mrs_lib_INCLUDE_DIRS}
   ${mrs_uav_testing_INCLUDE_DIRS}
+  ${mrs_modules_msgs_INCLUDE_DIRS}
+  ${mrs_msgs_INCLUDE_DIRS}
   )
 
 
@@ -90,6 +94,8 @@ add_library(MrsOctomapServer_Server SHARED
 target_link_libraries(MrsOctomapServer_Server
   ${PCL_LIBRARIES}
   ${OCTOMAP_LIBRARIES}
+  pcl_conversions
+  pcl_ros
   OpenMP::OpenMP_CXX
 )
 
