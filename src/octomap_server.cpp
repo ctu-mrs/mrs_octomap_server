@@ -168,7 +168,7 @@ class OctomapServer : public rclcpp::Node {
 public:
 
   OctomapServer(const rclcpp::NodeOptions& options);
-  virtual void onInit(const rclcpp::NodeOptions& options);
+  virtual void onInit();
 
   bool callbackLoadMap(std::shared_ptr<mrs_msgs::srv::String::Request> req, [[maybe_unused]] std::shared_ptr<mrs_msgs::srv::String::Response> resp);
   bool callbackSaveMap(std::shared_ptr<mrs_msgs::srv::String::Request> req, [[maybe_unused]] std::shared_ptr<mrs_msgs::srv::String::Response> resp);
@@ -363,7 +363,7 @@ private:
 
 /* onInit() //{ */
 
-void OctomapServer::onInit(const rclcpp::NodeOptions& options) {
+void OctomapServer::onInit() {
 
 
   /* params //{ */
@@ -612,7 +612,7 @@ void OctomapServer::onInit(const rclcpp::NodeOptions& options) {
 
   /* transformer //{ */
 
-  transformer_ = std::make_unique<mrs_lib::Transformer>("OctomapServer");
+  transformer_ = std::make_unique<mrs_lib::Transformer>(node_);
   transformer_->setDefaultPrefix(_uav_name_);
   transformer_->setLookupTimeout(rclcpp::Duration::from_seconds(0.5));
   transformer_->retryLookupNewest(false);
@@ -642,20 +642,41 @@ void OctomapServer::onInit(const rclcpp::NodeOptions& options) {
   sh_clear_box_            = mrs_lib::SubscriberHandler<mrs_modules_msgs::msg::PoseWithSize>(shopts, "~/clear_box_in");
 
   for (int i = 0; i < n_sensors_3d_lidar_; i++) {
-
+/*
     std::stringstream ss;
     ss << "lidar_3d_" << i << "_in";
     sh_3dlaser_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(
-    shopts, ss.str(), rclcpp::Duration::from_seconds(2.0),
+    shopts, ss.str(),
     std::bind(&OctomapServer::callback3dLidarCloud2, this, std::placeholders::_1, LIDAR_3D, i, ss.str(), false)));
+*/
 
+    sh_3dlaser_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(
+    shopts,
+    ss.str(),
+    [this, i, topic = ss.str()](const sensor_msgs::msg::PointCloud2::SharedPtr msg)
+    {
+        this->callback3dLidarCloud2(msg, LIDAR_3D, i, topic, false);
+    },
+    rclcpp::Duration::from_seconds(2.0)
+    ));
 
     std::stringstream ss2;
     ss2 << "lidar_3d_" << i << "_over_max_range_in";
 
+    /*
     sh_3dlaser_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(
         shopts, ss2.str(), rclcpp::Duration::from_seconds(2.0), std::bind(&OctomapServer::callback3dLidarCloud2, this, std::placeholders::_1, LIDAR_3D, i, ss.str(), true)));
-  }
+    }*/
+
+    sh_3dlaser_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(
+    shopts,
+    ss2.str(),
+    [this, i, topic = ss.str()](const sensor_msgs::msg::PointCloud2::SharedPtr msg)
+    {
+        this->callback3dLidarCloud2(msg, LIDAR_3D, i, topic, true);
+    },
+    rclcpp::Duration::from_seconds(2.0)
+));
 
   for (int i = 0; i < n_sensors_depth_cam_; i++) {
 
@@ -685,15 +706,15 @@ void OctomapServer::onInit(const rclcpp::NodeOptions& options) {
 
   /* service servers //{ */
 
-  ss_reset_map_ = this->create_service<std_srvs::srv::Trigger>(
+  ss_reset_map_ = node_->create_service<std_srvs::srv::Trigger>(
             "reset_map_in",
             std::bind(&OctomapServer::callbackResetMap, this,
                       std::placeholders::_1, std::placeholders::_2));
-  ss_save_map_ = this->create_service<std_srvs::srv::Trigger>(
+  ss_save_map_ = node_->create_service<std_srvs::srv::Trigger>(
             "save_map_in",
             std::bind(&OctomapServer::callbackSaveMap, this,
                       std::placeholders::_1, std::placeholders::_2));
-  ss_load_map_ = this->create_service<std_srvs::srv::Trigger>(
+  ss_load_map_ = node_->create_service<std_srvs::srv::Trigger>(
             "load_map_in",
             std::bind(&OctomapServer::callbackLoadMap, this,
                       std::placeholders::_1, std::placeholders::_2));   
@@ -851,7 +872,7 @@ void OctomapServer::callbackLaserScan(const sensor_msgs::msg::LaserScan::SharedP
 
     double free_scan_distance = (scan->range_max - 1.0) < _unknown_rays_distance_ ? (scan->range_max - 1.0) : _unknown_rays_distance_;
 
-    for (int i = 0; i < scan->ranges.size(); i++) {
+    for (size_t i = 0; i < scan->ranges.size(); i++) {
       if (scan->ranges[i] > scan->range_max || scan->ranges[i] < scan->range_min) {
         free_scan.ranges[i] = scan->range_max - 1.0;  // valid under max range
       } else {
