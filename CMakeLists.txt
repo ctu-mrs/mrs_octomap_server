@@ -12,8 +12,8 @@ add_compile_options(-O3 -DOCTOMAP_NODEBUGOUT)
 
 # 1 == use rclcpp::Timer implementation
 # 0 == use MRS's thread timer implementation
-#set(USE_ROS_TIMER 0)
-set(USE_ROS_TIMER 1)
+set(USE_ROS_TIMER 0)
+#set(USE_ROS_TIMER 1)
 
 
 if(${USE_ROS_TIMER})

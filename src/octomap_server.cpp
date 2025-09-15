@@ -80,12 +80,20 @@
 
 //}
 
+#if USE_ROS_TIMER == 1
+typedef mrs_lib::ROSTimer TimerType;
+#else
+typedef mrs_lib::ThreadTimer TimerType;
+#endif
+
 namespace mrs_octomap_server
 {
 
 namespace octomapServer
 {
 /* defines //{ */
+
+
 
 using vec3s_t = Eigen::Matrix<float, 3, -1>;
 using vec3_t  = Eigen::Vector3f;
@@ -208,24 +216,24 @@ private:
   
   // | ------------------------- timers ------------------------- |
 
-  rclcpp::TimerBase::SharedPtr timer_global_map_publisher_;
+  std::shared_ptr<TimerType> timer_global_map_publisher_;
   double     _global_map_publisher_rate_;
   void       timerGlobalMapPublisher();
 
-  rclcpp::TimerBase::SharedPtr timer_global_map_creator_;
+  std::shared_ptr<TimerType> timer_global_map_creator_;
   double     _global_map_creator_rate_;
   void       timerGlobalMapCreator();
 
-  rclcpp::TimerBase::SharedPtr timer_local_map_publisher_;
+  std::shared_ptr<TimerType> timer_local_map_publisher_;
   void       timerLocalMapPublisher();
 
-  rclcpp::TimerBase::SharedPtr timer_local_map_resizer_;
+  std::shared_ptr<TimerType> timer_local_map_resizer_;
   void       timerLocalMapResizer();
 
-  rclcpp::TimerBase::SharedPtr timer_persistency_;
+  std::shared_ptr<TimerType> timer_persistency_;
   void       timerPersistency();
 
-  rclcpp::TimerBase::SharedPtr timer_altitude_alignment_;
+  std::shared_ptr<TimerType> timer_altitude_alignment_;
   void       timerAltitudeAlignment();
 
   // | ----------------------- parameters ----------------------- |
@@ -693,41 +701,37 @@ void OctomapServer::onInit(const rclcpp::NodeOptions& options) {
   //}
 
   /* timers //{ */
+  mrs_lib::TimerHandlerOptions timer_opts_start;
+
+  timer_opts_start.node      = node_;
+  timer_opts_start.autostart = true;
 
   if (_global_map_enabled_) {
-
-    timer_global_map_publisher_ = this->create_wall_timer(
-            std::chrono::duration<double>(1.0 / _global_map_publisher_rate_),
-            std::bind(&OctomapServer::timerGlobalMapPublisher, this)
-        );
-    
-    timer_global_map_creator_ = this->create_wall_timer(
-            std::chrono::duration<double>(1.0 / _global_map_creator_rate_),
-            std::bind(&OctomapServer::timerGlobalMapCreator, this)
-        );
+    {
+    std::function<void()> callback_fcn = std::bind(&OctomapServer::timerGlobalMapPublisher, this);
+    timer_global_map_publisher_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(_global_map_publisher_rate_),callback_fcn);
+    }
+    {
+      std::function<void()> callback_fcn = std::bind(&OctomapServer::timerGlobalMapCreator, this);
+    timer_global_map_creator_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(_global_map_creator_rate_),callback_fcn);
+    }
   }
-  timer_local_map_publisher_ = this->create_wall_timer(
-            std::chrono::duration<double>(1.0 / _local_map_publisher_rate_),
-            std::bind(&OctomapServer::timerLocalMapPublisher, this)
-        );
-
-  timer_local_map_resizer_ = this->create_wall_timer(
-            std::chrono::duration<double>(1.0),
-            std::bind(&OctomapServer::timerLocalMapResizer, this)
-        );
-
+  {
+    std::function<void()> callback_fcn = std::bind(&OctomapServer::timerLocalMapPublisher, this);
+  timer_local_map_publisher_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(_local_map_publisher_rate_),callback_fcn);
+  }
+  {
+    std::function<void()> callback_fcn = std::bind(&OctomapServer::timerLocalMapResizer, this);
+    timer_local_map_resizer_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(1.0),callback_fcn);
+  }
   if (_persistency_enabled_) {
-    timer_persistency_ = this->create_wall_timer(
-            std::chrono::duration<double>(1.0 / _persistency_save_time_),
-            std::bind(&OctomapServer::timerPersistency, this)
-        );
+    std::function<void()> callback_fcn = std::bind(&OctomapServer::timerPersistency, this);
+    timer_persistency_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(_persistency_save_time_),callback_fcn);
   }
 
   if (_persistency_enabled_ && _persistency_align_altitude_enabled_) {
-    timer_altitude_alignment_ = this->create_wall_timer(
-            std::chrono::duration<double>(1.0),
-            std::bind(&OctomapServer::timerAltitudeAlignment, this)
-        );
+    std::function<void()> callback_fcn = std::bind(&OctomapServer::timerAltitudeAlignment, this);
+    timer_altitude_alignment_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(1.0),callback_fcn);
   }
 
   //}
@@ -1170,7 +1174,7 @@ bool OctomapServer::callbackLoadMap(std::shared_ptr<mrs_msgs::srv::String::Reque
     if (_persistency_enabled_ && _persistency_align_altitude_enabled_) {
       octrees_initialized_ = false;
 
-      timer_altitude_alignment_.start();
+      timer_altitude_alignment_->start();
     }
 
     res->success = true;
@@ -1277,7 +1281,7 @@ void OctomapServer::timerGlobalMapPublisher() {
     {
       std::scoped_lock lock(mutex_octree_global_);
 
-      mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer("OctomapServer::globalMapFullPublish", scope_timer_logger_, _scope_timer_enabled_);
+      mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer(node_,"OctomapServer::globalMapFullPublish", scope_timer_logger_, _scope_timer_enabled_);
 
       success = octomap_msgs::fullMapToMsg(*octree_global_, map);
     }
@@ -1300,7 +1304,7 @@ void OctomapServer::timerGlobalMapPublisher() {
     {
       std::scoped_lock lock(mutex_octree_global_);
 
-      mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer("OctomapServer::globalMapBinaryPublish", scope_timer_logger_, _scope_timer_enabled_);
+      mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer(node_,"OctomapServer::globalMapBinaryPublish", scope_timer_logger_, _scope_timer_enabled_);
 
       success = octomap_msgs::binaryMapToMsg(*octree_global_, map);
     }
@@ -1327,7 +1331,7 @@ void OctomapServer::timerGlobalMapCreator() {
     return;
   }
 
-  mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer("OctomapServer::timerGlobalMapCreator", scope_timer_logger_, _scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer(node_,"OctomapServer::timerGlobalMapCreator", scope_timer_logger_, _scope_timer_enabled_);
 
   RCLCPP_INFO_ONCE(this->get_logger()," global map creator timer spinning");
 
@@ -1414,7 +1418,7 @@ void OctomapServer::timerLocalMapPublisher() {
     {
       std::scoped_lock lock(mutex_octree_local_);
 
-      mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer("OctomapServer::localMapFullPublish", scope_timer_logger_, _scope_timer_enabled_);
+      mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer(node_,"OctomapServer::localMapFullPublish", scope_timer_logger_, _scope_timer_enabled_);
 
       success = octomap_msgs::fullMapToMsg(*octree_local_, map);
     }
@@ -1437,7 +1441,7 @@ void OctomapServer::timerLocalMapPublisher() {
     {
       std::scoped_lock lock(mutex_octree_local_);
 
-      mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer("OctomapServer::localMapBinaryPublish", scope_timer_logger_, _scope_timer_enabled_);
+      mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer(node_,"OctomapServer::localMapBinaryPublish", scope_timer_logger_, _scope_timer_enabled_);
 
       success = octomap_msgs::binaryMapToMsg(*octree_local_, map);
     }
@@ -1609,7 +1613,7 @@ void OctomapServer::timerAltitudeAlignment() {
         octrees_initialized_ = true;
       }
 
-      timer_altitude_alignment_.stop();
+      timer_altitude_alignment_->stop();
 
       RCLCPP_INFO(this->get_logger(),"stopping the altitude alignment timer");
 
@@ -1659,7 +1663,7 @@ void OctomapServer::timerAltitudeAlignment() {
       octrees_initialized_ = true;
     }
 
-    timer_altitude_alignment_.stop();
+    timer_altitude_alignment_->stop();
 
     RCLCPP_INFO(this->get_logger(),"stopping the altitude alignment timer");
 
@@ -1685,7 +1689,7 @@ void OctomapServer::timerAltitudeAlignment() {
 
   octrees_initialized_ = true;
 
-  timer_altitude_alignment_.stop();
+  timer_altitude_alignment_->stop();
 }
 
 //}
@@ -1696,7 +1700,7 @@ void OctomapServer::timerAltitudeAlignment() {
 void OctomapServer::insertPointCloud(const geometry_msgs::msg::Vector3& sensorOriginTf, const PCLPointCloud::ConstPtr& cloud,
                                      const PCLPointCloud::ConstPtr& free_vectors_cloud, double free_ray_distance, bool unknown_clear_occupied) {
 
-  mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer("OctomapServer::timerInsertPointCloud", scope_timer_logger_, _scope_timer_enabled_);
+  mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer(node_,"OctomapServer::timerInsertPointCloud", scope_timer_logger_, _scope_timer_enabled_);
 
   rclcpp::Time time_start = this->now();
 
@@ -1834,7 +1838,7 @@ void OctomapServer::insertPointCloud(const geometry_msgs::msg::Vector3& sensorOr
   // CROP THE MAP AROUND THE ROBOT
   {
 
-    mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer("OctomapServer::localMapCopy", scope_timer_logger_, _scope_timer_enabled_);
+    mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer(node_,"OctomapServer::localMapCopy", scope_timer_logger_, _scope_timer_enabled_);
 
     auto [local_map_width, local_map_height] = mrs_lib::get_mutexed(mutex_local_map_dimensions_, local_map_width_, local_map_height_);
 
