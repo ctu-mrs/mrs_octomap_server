@@ -67,7 +67,7 @@
 
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Matrix3x3.h>
-
+#include <tf2_eigen/tf2_eigen.hpp>
 
 
 
@@ -830,9 +830,10 @@ void OctomapServer::callbackLaserScan(const sensor_msgs::msg::LaserScan::SharedP
     return;
   }
 
-  Eigen::Affine3d eigen_transform = octomap::transformToEigen(res.transform);
-  sensorToWorld = eigen_transform.matrix().cast<float>();
-
+  // Convert the transform to an Eigen matrix using tf2
+  sensorToWorldTf = res.value();
+  Eigen::Isometry3d eigen_transform = tf2::transformToEigen(sensorToWorldTf.transform);
+  sensorToWorld = eigen_transform.matrix().cast<float>(); 
 
   // laser scan to point cloud
   sensor_msgs::msg::PointCloud2 ros_cloud;
@@ -935,11 +936,13 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::S
     return;
   }
 
-  Eigen::Matrix4f                 sensorToWorld;
+  Eigen::Matrix4f sensorToWorld;
   geometry_msgs::msg::TransformStamped sensorToWorldTf = res.value();
 
-  Eigen::Affine3d eigen_transform = octomap::transformToEigen(res.transform);
+  // Convert transform to Eigen matrix using tf2_eigen
+  Eigen::Isometry3d eigen_transform = tf2::transformToEigen(sensorToWorldTf.transform);
   sensorToWorld = eigen_transform.matrix().cast<float>();
+
 
 
   double max_range;
@@ -1152,7 +1155,7 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::S
 
 /* callbackLoadMap() //{ */
 
-bool OctomapServer::callbackLoadMap([[maybe_unused]] std::shared_ptr<mrs_msgs::srv::String::Request> req, [[maybe_unused]] std::shared_ptr<mrs_msgs::srv::String::Response> res) {
+bool OctomapServer::callbackLoadMap(std::shared_ptr<mrs_msgs::srv::String::Request> req, std::shared_ptr<mrs_msgs::srv::String::Response> res) {
 
   if (!is_initialized_) {
     return false;
