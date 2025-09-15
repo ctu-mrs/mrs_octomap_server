@@ -1161,9 +1161,9 @@ bool OctomapServer::callbackLoadMap(std::shared_ptr<mrs_msgs::srv::String::Reque
     return false;
   }
 
-  RCLCPP_INFO(this->get_logger(),"[OctomapServer]: loading map");
+  RCLCPP_INFO(this->get_logger()," loading map");
 
-  bool success = loadFromFile(req.value);
+  bool success = loadFromFile(req->value);
 
   if (success) {
 
@@ -1173,13 +1173,13 @@ bool OctomapServer::callbackLoadMap(std::shared_ptr<mrs_msgs::srv::String::Reque
       timer_altitude_alignment_.start();
     }
 
-    res.success = true;
-    res.message = "map loaded";
+    res->success = true;
+    res->message = "map loaded";
 
   } else {
 
-    res.success = false;
-    res.message = "map loading error";
+    res->success = false;
+    res->message = "map loading error";
   }
 
   return true;
@@ -1195,17 +1195,17 @@ bool OctomapServer::callbackSaveMap([[maybe_unused]] std::shared_ptr<mrs_msgs::s
     return false;
   }
 
-  bool success = saveToFile(req.value);
+  bool success = saveToFile(req->value);
 
   if (success) {
 
-    res.message = "map saved";
-    res.success = true;
+    res->message = "map saved";
+    res->success = true;
 
   } else {
 
-    res.message = "map saving failed";
-    res.success = false;
+    res->message = "map saving failed";
+    res->success = false;
   }
 
   return true;
@@ -1302,7 +1302,7 @@ void OctomapServer::timerGlobalMapPublisher() {
 
       mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer("OctomapServer::globalMapBinaryPublish", scope_timer_logger_, _scope_timer_enabled_);
 
-      success = octomap_msgs::msg::binaryMapToMsg(*octree_global_, map);
+      success = octomap_msgs::binaryMapToMsg(*octree_global_, map);
     }
 
     if (success) {
@@ -1439,7 +1439,7 @@ void OctomapServer::timerLocalMapPublisher() {
 
       mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer("OctomapServer::localMapBinaryPublish", scope_timer_logger_, _scope_timer_enabled_);
 
-      success = octomap_msgs::msg::binaryMapToMsg(*octree_local_, map);
+      success = octomap_msgs::binaryMapToMsg(*octree_local_, map);
     }
 
     if (success) {
@@ -1534,7 +1534,7 @@ void OctomapServer::timerPersistency() {
 
   if (control_manager_diag->flying_normally) {
 
-    RCLCPP_INFO_THROTTLE(this->get_logger(),*this->get_logger(),1000, "saving the map");
+    RCLCPP_INFO_THROTTLE(this->get_logger(),*this->get_clock(),1000, "saving the map");
 
     bool success = saveToFile(_persistency_map_name_);
 
