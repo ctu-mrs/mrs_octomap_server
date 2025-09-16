@@ -86,14 +86,13 @@ typedef mrs_lib::ROSTimer TimerType;
 typedef mrs_lib::ThreadTimer TimerType;
 #endif
 
+/* defines //{ */
+
 namespace mrs_octomap_server
 {
 
 namespace octomapServer
 {
-/* defines //{ */
-
-
 
 using vec3s_t = Eigen::Matrix<float, 3, -1>;
 using vec3_t  = Eigen::Vector3f;
@@ -162,6 +161,8 @@ const std::string _sensor_names_[] = {"LIDAR_3D", "LIDAR_2D", "LIDAR_1D", "DEPTH
 
 //}
 
+
+
 /* class OctomapServer //{ */
 class OctomapServer : public rclcpp::Node {
 
@@ -175,11 +176,11 @@ public:
 
   bool callbackResetMap(std::shared_ptr<std_srvs::srv::Empty::Request> req, std::shared_ptr<std_srvs::srv::Empty::Response> resp);
 
-  void callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::SharedPtr msg, const SensorType_t sensor_type, const int sensor_id, const std::string topic,
-                             const bool pcl_over_max_range = false);
+  void callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg, const SensorType_t sensor_type, const int sensor_id, const std::string topic,
+                             const bool pcl_over_max_range);
 
   void callbackLaserScan(const sensor_msgs::msg::LaserScan::SharedPtr msg);
-  void callbackCameraInfo(const sensor_msgs::msg::CameraInfo::SharedPtr msg, const int sensor_id);
+  void callbackCameraInfo(const sensor_msgs::msg::CameraInfo::ConstSharedPtr msg, const int sensor_id);
   bool loadFromFile(const std::string& filename);
   bool saveToFile(const std::string& filename);
 
@@ -642,65 +643,63 @@ void OctomapServer::onInit() {
   sh_clear_box_            = mrs_lib::SubscriberHandler<mrs_modules_msgs::msg::PoseWithSize>(shopts, "~/clear_box_in");
 
   for (int i = 0; i < n_sensors_3d_lidar_; i++) {
-/*
-    std::stringstream ss;
-    ss << "lidar_3d_" << i << "_in";
-    sh_3dlaser_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(
-    shopts, ss.str(),
-    std::bind(&OctomapServer::callback3dLidarCloud2, this, std::placeholders::_1, LIDAR_3D, i, ss.str(), false)));
-*/
 
-    sh_3dlaser_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(
-    shopts,
-    ss.str(),
-    [this, i, topic = ss.str()](const sensor_msgs::msg::PointCloud2::SharedPtr msg)
-    {
-        this->callback3dLidarCloud2(msg, LIDAR_3D, i, topic, false);
-    },
-    rclcpp::Duration::from_seconds(2.0)
-    ));
+    std::stringstream ss;
+    ss << "~/lidar_3d_" << i << "_in";
+
+    // std::function<void(const sensor_msgs::msg::PointCloud2::SharedPtr, const SensorType_t, const int, const std::string, const bool)> callback_fcn = 
+    auto callback = [this, i, topic = ss.str()](const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) {
+      this->callback3dLidarCloud2(msg, LIDAR_3D, i, topic, false);
+    };
+    sh_3dlaser_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(shopts, ss.str(), callback));
+    //sh_3dlaser_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::PointCloud2>(shopts, ss.str(), std::bind(&OctomapServer::callback3dLidarCloud2, this, std::placeholders::_1, LIDAR_3D, i, ss.str(), false)));
+    //sh_3dlaser_pc2_.push_back(mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>(shopts, ss.str(), ros::Duration(2.0), std::bind(&LososServer::callback3dLidarCloud2, this, std::placeholders::_1, LIDAR_3D, i, ss.str(), false)));
+
 
     std::stringstream ss2;
-    ss2 << "lidar_3d_" << i << "_over_max_range_in";
+    ss2 << "~/lidar_3d_" << i << "_over_max_range_in";
+    auto callback_ss2 = [this, i, topic = ss2.str()](const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) {
+      this->callback3dLidarCloud2(msg, LIDAR_3D, i, topic, true);
+    };
+    sh_3dlaser_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(shopts, ss.str(), callback_ss2));
+  }
 
-    /*
-    sh_3dlaser_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(
-        shopts, ss2.str(), rclcpp::Duration::from_seconds(2.0), std::bind(&OctomapServer::callback3dLidarCloud2, this, std::placeholders::_1, LIDAR_3D, i, ss.str(), true)));
-    }*/
 
-    sh_3dlaser_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(
-    shopts,
-    ss2.str(),
-    [this, i, topic = ss.str()](const sensor_msgs::msg::PointCloud2::SharedPtr msg)
-    {
-        this->callback3dLidarCloud2(msg, LIDAR_3D, i, topic, true);
-    },
-    rclcpp::Duration::from_seconds(2.0)
-));
+
 
   for (int i = 0; i < n_sensors_depth_cam_; i++) {
 
+    
     std::stringstream ss;
-    ss << "depth_camera_" << i << "_in";
+    ss << "~/depth_camera_" << i << "_in";
+    auto callback = [this, i, topic = ss.str()](const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) {
+      this->callback3dLidarCloud2(msg, DEPTH_CAMERA, i, topic, false);
+    sh_depth_cam_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(shopts, ss.str(), callback));
+    };
 
-    sh_depth_cam_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(
-        shopts, ss.str(), rclcpp::Duration::from_seconds(2.0), std::bind(&OctomapServer::callback3dLidarCloud2, this, std::placeholders::_1, DEPTH_CAMERA, i, ss.str(), false)));
 
     std::stringstream ss2;
-    ss2 << "depth_camera_" << i << "_over_max_range_in";
+    ss2 << "~/depth_camera_" << i << "_over_max_range_in";
+    auto callback_ss2 = [this, i, topic = ss2.str()](const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) {
+      this->callback3dLidarCloud2(msg, DEPTH_CAMERA, i, topic, true);
+    };
+    sh_depth_cam_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(shopts, ss.str(), callback_ss2));
 
-    sh_depth_cam_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(
-        shopts, ss2.str(), rclcpp::Duration::from_seconds(2.0), std::bind(&OctomapServer::callback3dLidarCloud2, this, std::placeholders::_1, DEPTH_CAMERA, i, ss.str(), true)));
   }
 
   for (int i = 0; i < n_sensors_depth_cam_; i++) {
 
     std::stringstream ss;
-    ss << "camera_info_" << i << "_in";
+    ss << "~/camera_info_" << i << "_in";
 
-    sh_depth_cam_info_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::CameraInfo>(
-        shopts, ss.str(), rclcpp::Duration::from_seconds(2.0), std::bind(&OctomapServer::callbackCameraInfo, this, std::placeholders::_1, i)));
-  }
+
+    auto callback = [this, i](const sensor_msgs::msg::CameraInfo::SharedPtr msg) {
+      this->callbackCameraInfo(msg, i);
+    };
+    sh_depth_cam_info_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::CameraInfo>(shopts, ss.str(), callback));
+    
+  
+      }
 
   //}
 
@@ -775,7 +774,7 @@ void OctomapServer::onInit() {
 
 /* callbackCameraInfo() //{ */
 
-void OctomapServer::callbackCameraInfo(const sensor_msgs::msg::CameraInfo::SharedPtr msg, const int sensor_id) {
+void OctomapServer::callbackCameraInfo(const sensor_msgs::msg::CameraInfo::ConstSharedPtr msg, const int sensor_id) {
 
   if (!is_initialized_) {
     return;
@@ -905,7 +904,7 @@ void OctomapServer::callbackLaserScan(const sensor_msgs::msg::LaserScan::SharedP
 
 /* callback3dLidarCloud2() //{ */
 
-void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::SharedPtr msg, const SensorType_t sensor_type, const int sensor_id,
+void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg, const SensorType_t sensor_type, const int sensor_id,
                                           const std::string topic, const bool pcl_over_max_range) {
 
   if (!is_initialized_) {
@@ -957,7 +956,7 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::S
   auto res = transformer_->getTransform(cloud->header.frame_id, _world_frame_, cloud->header.stamp);
 
   if (!res) {
-    RCLCPP_WARN_THROTTLE(this->get_logger(),*this->get_clock(),1000, "callback3dLidarCloud2(): could not find tf from %s to %s", cloud->header.frame_id.c_str(), _world_frame_.c_str());
+    RCLCPP_WARN_THROTTLE(this->get_logger(),*this->get_clock(),1000, "could not find tf from %s to %s", cloud->header.frame_id.c_str(), _world_frame_.c_str());
     return;
   }
 
