@@ -75,7 +75,6 @@ include_directories(
   ${mrs_lib_INCLUDE_DIRS}
   ${mrs_modules_msgs_INCLUDE_DIRS}
   ${mrs_msgs_INCLUDE_DIRS}
-  ##${PCL_INCLUDE_DIRS}
   )
 
 
@@ -89,15 +88,6 @@ add_library(MrsOctomapServer_Server SHARED
   src/octomap_server.cpp
   src/conversions.cpp
 )
-
-## a voir
-##target_link_libraries(MrsOctomapServer_Server
-  ##${PCL_LIBRARIES}
-  ##${OCTOMAP_LIBRARIES}
-  ##pcl_conversions
-  ##pcl_ros
-  ##OpenMP::OpenMP_CXX
-##)
 
 ament_target_dependencies(MrsOctomapServer_Server
   ${DEPENDENCIES}
