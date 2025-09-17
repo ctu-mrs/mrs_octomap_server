@@ -73,9 +73,9 @@ include_directories(
   include
   ${rclcpp_INCLUDE_DIRS}
   ${mrs_lib_INCLUDE_DIRS}
-  ${mrs_uav_testing_INCLUDE_DIRS}
   ${mrs_modules_msgs_INCLUDE_DIRS}
   ${mrs_msgs_INCLUDE_DIRS}
+  ##${PCL_INCLUDE_DIRS}
   )
 
 
@@ -91,13 +91,13 @@ add_library(MrsOctomapServer_Server SHARED
 )
 
 ## a voir
-target_link_libraries(MrsOctomapServer_Server
-  ${PCL_LIBRARIES}
-  ${OCTOMAP_LIBRARIES}
-  pcl_conversions
-  pcl_ros
-  OpenMP::OpenMP_CXX
-)
+##target_link_libraries(MrsOctomapServer_Server
+  ##${PCL_LIBRARIES}
+  ##${OCTOMAP_LIBRARIES}
+  ##pcl_conversions
+  ##pcl_ros
+  ##OpenMP::OpenMP_CXX
+##)
 
 ament_target_dependencies(MrsOctomapServer_Server
   ${DEPENDENCIES}
@@ -131,23 +131,13 @@ install(
   DESTINATION share/${PROJECT_NAME}
   )
 
-install(
-  DIRECTORY config
-  DESTINATION share/${PROJECT_NAME}
-  )
-
-install(
-  DIRECTORY scripts
-  USE_SOURCE_PERMISSIONS
-  DESTINATION lib/${PROJECT_NAME}
-  )
 
 ament_export_targets(
   export_${PROJECT_NAME} HAS_LIBRARY_TARGET
-  )
+)
 
 ament_export_dependencies(
   ${DEPENDENCIES}
-  )
+)
 
 ament_package()

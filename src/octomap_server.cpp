@@ -174,7 +174,7 @@ public:
   bool callbackLoadMap(const std::shared_ptr<mrs_msgs::srv::String::Request> req, std::shared_ptr<mrs_msgs::srv::String::Response> resp);
   bool callbackSaveMap(const std::shared_ptr<mrs_msgs::srv::String::Request> req, std::shared_ptr<mrs_msgs::srv::String::Response> resp);
 
-  bool callbackResetMap(const std::shared_ptr<std_srvs::srv::Empty::Request> req, std::shared_ptr<std_srvs::srv::Empty::Response> resp);
+  bool callbackResetMap([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Empty::Request> req, [[maybe_unused]] std::shared_ptr<std_srvs::srv::Empty::Response> resp);
 
   void callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg, const SensorType_t sensor_type, const int sensor_id, const std::string topic,
                              const bool pcl_over_max_range);
@@ -868,7 +868,7 @@ void OctomapServer::callbackLaserScan(const sensor_msgs::msg::LaserScan::SharedP
 
     sensor_msgs::msg::LaserScan free_scan = *scan;
 
-    double free_scan_distance = (scan->range_max - 1.0) < _unknown_rays_distance_ ? (scan->range_max - 1.0) : _unknown_rays_distance_;
+    [[maybe_unused]] double free_scan_distance = (scan->range_max - 1.0) < _unknown_rays_distance_ ? (scan->range_max - 1.0) : _unknown_rays_distance_;
 
     for (size_t i = 0; i < scan->ranges.size(); i++) {
       if (scan->ranges[i] > scan->range_max || scan->ranges[i] < scan->range_min) {
@@ -896,7 +896,7 @@ void OctomapServer::callbackLaserScan(const sensor_msgs::msg::LaserScan::SharedP
 
   insertPointCloud(sensorToWorldTf.transform.translation, pc, free_vectors_pc, _unknown_rays_distance_, _unknown_rays_clear_occupied_);
 
-  const octomap::point3d sensor_origin = octomap::pointTfToOctomap(sensorToWorldTf.transform.translation);
+  [[maybe_unused]] const octomap::point3d sensor_origin = octomap::pointTfToOctomap(sensorToWorldTf.transform.translation);
 }
 
 //}
@@ -985,9 +985,9 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
         std::scoped_lock lock(mutex_lut_);
 
         // change number of rays if it differs from the pointcloud dimensions
-        if (sensor_params_3d_lidar_[sensor_id].horizontal_rays != cloud->width || sensor_params_3d_lidar_[sensor_id].vertical_rays != cloud->height) {
-          sensor_params_3d_lidar_[sensor_id].horizontal_rays = cloud->width;
-          sensor_params_3d_lidar_[sensor_id].vertical_rays   = cloud->height;
+        if (sensor_params_3d_lidar_[sensor_id].horizontal_rays != static_cast<int>(cloud->width) || sensor_params_3d_lidar_[sensor_id].vertical_rays != static_cast<int>(cloud->height)) {
+          sensor_params_3d_lidar_[sensor_id].horizontal_rays = static_cast<int>(cloud->width);
+          sensor_params_3d_lidar_[sensor_id].vertical_rays   = static_cast<int>(cloud->height);
           RCLCPP_INFO(this->get_logger(),"Changing sensor params for lidar %d to %d horizontal rays, %d vertical rays.", sensor_id,
                    sensor_params_3d_lidar_[sensor_id].horizontal_rays, sensor_params_3d_lidar_[sensor_id].vertical_rays);
           initialize3DLidarLUT(sensor_3d_lidar_xyz_lut_[sensor_id], sensor_params_3d_lidar_[sensor_id]);
@@ -1003,9 +1003,9 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
         std::scoped_lock lock(mutex_lut_);
 
         // change number of rays if it differs from the pointcloud dimensions
-        if (sensor_params_depth_cam_[sensor_id].horizontal_rays != cloud->width || sensor_params_depth_cam_[sensor_id].vertical_rays != cloud->height) {
-          sensor_params_depth_cam_[sensor_id].horizontal_rays = cloud->width;
-          sensor_params_depth_cam_[sensor_id].vertical_rays   = cloud->height;
+        if (sensor_params_depth_cam_[sensor_id].horizontal_rays != static_cast<int>(cloud->width) || sensor_params_depth_cam_[sensor_id].vertical_rays != static_cast<int>(cloud->height)) {
+          sensor_params_depth_cam_[sensor_id].horizontal_rays = static_cast<int>(cloud->width);
+          sensor_params_depth_cam_[sensor_id].vertical_rays   = static_cast<int>(cloud->height);
           RCLCPP_INFO(
               this->get_logger(), "Changing sensor params for depth camera %d to %d horizontal rays, %d vertical rays, %.3f horizontal FOV, %.3f vertical FOV.",
               sensor_id, sensor_params_depth_cam_[sensor_id].horizontal_rays, sensor_params_depth_cam_[sensor_id].vertical_rays,
@@ -1055,7 +1055,7 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
   } else {
 
     // go through the pointcloud
-    for (int i = 0; i < pc->size(); i++) {
+    for (int i = 0; i < static_cast<int>(pc->size()); i++) {
 
       pcl::PointXYZ pt = pc->at(i);
 
@@ -1156,7 +1156,7 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
 
   insertPointCloud(sensorToWorldTf.transform.translation, hit_pc, free_vectors_pc, free_ray_distance, unknown_clear_occupied);
 
-  const octomap::point3d sensor_origin = octomap::pointTfToOctomap(sensorToWorldTf.transform.translation);
+  [[maybe_unused]] const octomap::point3d sensor_origin = octomap::pointTfToOctomap(sensorToWorldTf.transform.translation);
 
   {
     std::scoped_lock lock(mutex_avg_time_cloud_insertion_);
@@ -1238,7 +1238,7 @@ bool OctomapServer::callbackSaveMap(const std::shared_ptr<mrs_msgs::srv::String:
 
 /* callbackResetMap() //{ */
 
-bool OctomapServer::callbackResetMap(const std::shared_ptr<std_srvs::srv::Empty::Request> req, std::shared_ptr<std_srvs::srv::Empty::Response> resp) {
+bool OctomapServer::callbackResetMap([[maybe_unused]] const std::shared_ptr<std_srvs::srv::Empty::Request> req,[[maybe_unused]] std::shared_ptr<std_srvs::srv::Empty::Response> resp) {
 
   {
     std::scoped_lock lock(mutex_octree_global_, mutex_octree_local_);
@@ -2048,8 +2048,8 @@ void OctomapServer::initializeDepthCamLUT(xyz_lut_t& lut, const SensorParamsDept
 
       p = rot * p;
 
-      double r = (double)(i) / horizontalRangeCount;
-      double g = (double)(j) / horizontalRangeCount;
+      [[maybe_unused]] double r = (double)(i) / horizontalRangeCount;
+      [[maybe_unused]] double g = (double)(j) / horizontalRangeCount;
 
       coord_coeffs.push_back({p.x(), p.y(), p.z()});
     }
@@ -2305,7 +2305,7 @@ std::optional<double> OctomapServer::getGroundZ(std::shared_ptr<OcTree_t>& octre
 
     double max_z = std::numeric_limits<double>::lowest();
 
-    for (int i = 0; i < occupied_points.size(); i++) {
+    for (int i = 0; i < static_cast<int>(occupied_points.size()); i++) {
       if (occupied_points[i].z() > max_z) {
         max_z = occupied_points[i].z() - (octree_resolution_ / 2.0);
       }
@@ -2346,7 +2346,7 @@ bool OctomapServer::translateMap(std::shared_ptr<OcTree_t>& octree, const double
     coords.z() += float(z);
 
     auto value = it->getValue();
-    auto key   = it.getKey();
+    [[maybe_unused]] auto key   = it.getKey();
 
     auto new_key = octree_new->coordToKey(coords);
 
