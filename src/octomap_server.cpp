@@ -171,10 +171,10 @@ public:
   OctomapServer(const rclcpp::NodeOptions& options);
   virtual void onInit();
 
-  bool callbackLoadMap(std::shared_ptr<mrs_msgs::srv::String::Request> req, [[maybe_unused]] std::shared_ptr<mrs_msgs::srv::String::Response> resp);
-  bool callbackSaveMap(std::shared_ptr<mrs_msgs::srv::String::Request> req, [[maybe_unused]] std::shared_ptr<mrs_msgs::srv::String::Response> resp);
+  bool callbackLoadMap(const std::shared_ptr<mrs_msgs::srv::String::Request> req, std::shared_ptr<mrs_msgs::srv::String::Response> resp);
+  bool callbackSaveMap(const std::shared_ptr<mrs_msgs::srv::String::Request> req, std::shared_ptr<mrs_msgs::srv::String::Response> resp);
 
-  bool callbackResetMap(std::shared_ptr<std_srvs::srv::Empty::Request> req, std::shared_ptr<std_srvs::srv::Empty::Response> resp);
+  bool callbackResetMap(const std::shared_ptr<std_srvs::srv::Empty::Request> req, std::shared_ptr<std_srvs::srv::Empty::Response> resp);
 
   void callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg, const SensorType_t sensor_type, const int sensor_id, const std::string topic,
                              const bool pcl_over_max_range);
@@ -209,9 +209,9 @@ private:
 
   // | -------------------- service servers -------------------- |
 
-  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr ss_reset_map_;
-  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr ss_save_map_;
-  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr ss_load_map_;
+  rclcpp::Service<std_srvs::srv::Empty>::SharedPtr ss_reset_map_;
+  rclcpp::Service<mrs_msgs::srv::String>::SharedPtr ss_save_map_;
+  rclcpp::Service<mrs_msgs::srv::String>::SharedPtr ss_load_map_;
 
 
   
@@ -674,8 +674,8 @@ void OctomapServer::onInit() {
     ss << "~/depth_camera_" << i << "_in";
     auto callback = [this, i, topic = ss.str()](const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) {
       this->callback3dLidarCloud2(msg, DEPTH_CAMERA, i, topic, false);
-    sh_depth_cam_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(shopts, ss.str(), callback));
     };
+    sh_depth_cam_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(shopts, ss.str(), callback));
 
 
     std::stringstream ss2;
@@ -693,7 +693,7 @@ void OctomapServer::onInit() {
     ss << "~/camera_info_" << i << "_in";
 
 
-    auto callback = [this, i](const sensor_msgs::msg::CameraInfo::SharedPtr msg) {
+    auto callback = [this, i](const sensor_msgs::msg::CameraInfo::ConstSharedPtr msg) {
       this->callbackCameraInfo(msg, i);
     };
     sh_depth_cam_info_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::CameraInfo>(shopts, ss.str(), callback));
@@ -705,15 +705,15 @@ void OctomapServer::onInit() {
 
   /* service servers //{ */
 
-  ss_reset_map_ = node_->create_service<std_srvs::srv::Trigger>(
+  ss_reset_map_ = this->create_service<std_srvs::srv::Empty>(
             "reset_map_in",
             std::bind(&OctomapServer::callbackResetMap, this,
                       std::placeholders::_1, std::placeholders::_2));
-  ss_save_map_ = node_->create_service<std_srvs::srv::Trigger>(
+  ss_save_map_ = this->create_service<mrs_msgs::srv::String>(
             "save_map_in",
             std::bind(&OctomapServer::callbackSaveMap, this,
                       std::placeholders::_1, std::placeholders::_2));
-  ss_load_map_ = node_->create_service<std_srvs::srv::Trigger>(
+  ss_load_map_ = this->create_service<mrs_msgs::srv::String>(
             "load_map_in",
             std::bind(&OctomapServer::callbackLoadMap, this,
                       std::placeholders::_1, std::placeholders::_2));   
@@ -759,8 +759,7 @@ void OctomapServer::onInit() {
   /* scope timer logger //{ */
 
   const std::string scope_timer_log_filename = param_loader.loadParam2("scope_timer/log_filename", std::string(""));
-  scope_timer_logger_                        = std::make_shared<mrs_lib::ScopeTimerLogger>(scope_timer_log_filename, scope_timer_enabled_);
-
+  scope_timer_logger_ = std::make_shared<mrs_lib::ScopeTimerLogger>(node_, scope_timer_log_filename, _scope_timer_enabled_);
   //}
 
   is_initialized_ = true;
@@ -1179,7 +1178,7 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
 
 /* callbackLoadMap() //{ */
 
-bool OctomapServer::callbackLoadMap(std::shared_ptr<mrs_msgs::srv::String::Request> req, std::shared_ptr<mrs_msgs::srv::String::Response> res) {
+bool OctomapServer::callbackLoadMap(const std::shared_ptr<mrs_msgs::srv::String::Request> req, std::shared_ptr<mrs_msgs::srv::String::Response> res) {
 
   if (!is_initialized_) {
     return false;
@@ -1213,7 +1212,7 @@ bool OctomapServer::callbackLoadMap(std::shared_ptr<mrs_msgs::srv::String::Reque
 
 /* callbackSaveMap() //{ */
 
-bool OctomapServer::callbackSaveMap([[maybe_unused]] std::shared_ptr<mrs_msgs::srv::String::Request> req, [[maybe_unused]] std::shared_ptr<mrs_msgs::srv::String::Response> res) {
+bool OctomapServer::callbackSaveMap(const std::shared_ptr<mrs_msgs::srv::String::Request> req, std::shared_ptr<mrs_msgs::srv::String::Response> res) {
 
   if (!is_initialized_) {
     return false;
@@ -1239,7 +1238,7 @@ bool OctomapServer::callbackSaveMap([[maybe_unused]] std::shared_ptr<mrs_msgs::s
 
 /* callbackResetMap() //{ */
 
-bool OctomapServer::callbackResetMap([[maybe_unused]] std::shared_ptr<std_srvs::srv::Empty::Request> req, [[maybe_unused]] std::shared_ptr<std_srvs::srv::Empty::Response> resp) {
+bool OctomapServer::callbackResetMap(const std::shared_ptr<std_srvs::srv::Empty::Request> req, std::shared_ptr<std_srvs::srv::Empty::Response> resp) {
 
   {
     std::scoped_lock lock(mutex_octree_global_, mutex_octree_local_);
