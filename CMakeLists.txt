@@ -61,7 +61,7 @@ set(DEPENDENCIES
   )
 
 set(LIBRARIES
-  MrsOctomapServer_Server
+  MrsOctomapServer
   )
 
 
@@ -84,20 +84,20 @@ include_directories(
 ## |                           Compile                          |
 ## --------------------------------------------------------------
 
-add_library(MrsOctomapServer_Server SHARED
+add_library(MrsOctomapServer SHARED
   src/octomap_server.cpp
   src/conversions.cpp
 )
 
-ament_target_dependencies(MrsOctomapServer_Server
+ament_target_dependencies(MrsOctomapServer
   ${DEPENDENCIES}
-  )
+)
 
 
 ## components
-rclcpp_components_register_nodes(MrsOctomapServer_Server PLUGIN "mrs_octomap_server::OctomapServer" EXECUTABLE MrsOctomapServer_Server)
+rclcpp_components_register_nodes(MrsOctomapServer PLUGIN "mrs_octomap_server::OctomapServer" EXECUTABLE MrsOctomapServer)
 
-target_compile_definitions(MrsOctomapServer_Server PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
+target_compile_definitions(MrsOctomapServer PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
 
 ## --------------------------------------------------------------
 ## |                           install                          |
@@ -116,11 +116,22 @@ install(
   RUNTIME DESTINATION bin
   )
 
+
+install(DIRECTORY include/
+  DESTINATION .)
+
 install(
   DIRECTORY launch
   DESTINATION share/${PROJECT_NAME}
   )
 
+
+install(
+  DIRECTORY config/
+  DESTINATION share/${PROJECT_NAME}
+)
+
+ament_export_include_directories(include)
 
 ament_export_targets(
   export_${PROJECT_NAME} HAS_LIBRARY_TARGET
