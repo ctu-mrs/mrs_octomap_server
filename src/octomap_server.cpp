@@ -91,8 +91,6 @@ typedef mrs_lib::ThreadTimer TimerType;
 namespace mrs_octomap_server
 {
 
-namespace octomapServer
-{
 
 using vec3s_t = Eigen::Matrix<float, 3, -1>;
 using vec3_t  = Eigen::Vector3f;
@@ -162,7 +160,6 @@ const std::string _sensor_names_[] = {"LIDAR_3D", "LIDAR_2D", "LIDAR_1D", "DEPTH
 //}
 
 
-
 /* class OctomapServer //{ */
 class OctomapServer : public rclcpp::Node {
 
@@ -187,6 +184,7 @@ public:
 private:
   std::atomic<bool> is_initialized_ = false;
   rclcpp::Node::SharedPtr node_;
+  rclcpp::Clock::SharedPtr clock_;
 
   // | -------------------- topic subscribers ------------------- |
 
@@ -216,6 +214,7 @@ private:
 
   
   // | ------------------------- timers ------------------------- |
+  rclcpp ::TimerBase::SharedPtr timer_init_;
 
   std::shared_ptr<TimerType> timer_global_map_publisher_;
   double     _global_map_publisher_rate_;
@@ -365,9 +364,13 @@ private:
 /* onInit() //{ */
 
 void OctomapServer::onInit() {
+  timer_init_->cancel();
+  node_ = this->shared_from_this(); 
+  clock_ = node_->get_clock();
 
 
   /* params //{ */
+
 
   mrs_lib::ParamLoader param_loader(shared_from_this(), this->get_name());
 
@@ -968,7 +971,7 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
 
 
 
-  double max_range;
+  double max_range = 0.0;     //a voir pour debug
 
   if (!pcl_over_max_range) {
 
@@ -1993,7 +1996,7 @@ void OctomapServer::initialize3DLidarLUT(xyz_lut_t& lut, const SensorParams3DLid
       it++;
     }
   }
-}  // namespace mrs_octomap_server
+}
 
 //}
 
@@ -2377,9 +2380,12 @@ void OctomapServer::timeoutGeneric(const std::string& topic, const rclcpp::Time&
   );
 }
 /*//}*/
+
+OctomapServer::OctomapServer(const rclcpp::NodeOptions& options) : rclcpp::Node("octomap_server", options) {
+  timer_init_ = this->create_wall_timer(std::chrono::duration<double>(0.1), std::bind(&OctomapServer::onInit, this));
 }
 
 }  // namespace mrs_octomap_server
 
 #include <rclcpp_components/register_node_macro.hpp>
-RCLCPP_COMPONENTS_REGISTER_NODE(mrs_octomap_server::octomapServer::OctomapServer)
+RCLCPP_COMPONENTS_REGISTER_NODE(mrs_octomap_server::OctomapServer)

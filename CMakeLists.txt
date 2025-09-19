@@ -95,7 +95,7 @@ ament_target_dependencies(MrsOctomapServer_Server
 
 
 ## components
-rclcpp_components_register_nodes(MrsOctomapServer_Server PLUGIN "mrs_octomap_server::octomapServer::OctomapServer" EXECUTABLE MrsOctomapServer_Server)
+rclcpp_components_register_nodes(MrsOctomapServer_Server PLUGIN "mrs_octomap_server::OctomapServer" EXECUTABLE MrsOctomapServer_Server)
 
 target_compile_definitions(MrsOctomapServer_Server PRIVATE USE_ROS_TIMER=${USE_ROS_TIMER})
 

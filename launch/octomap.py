@@ -15,6 +15,10 @@ from launch.substitutions import (
 )
 from launch_ros.actions import Node, ComposableNodeContainer, LoadComposableNodes
 from launch_ros.descriptions import ComposableNode
+from launch.actions import LogInfo
+from launch_ros.actions import Node
+
+
 
 def generate_launch_description():
     """
@@ -199,6 +203,9 @@ def generate_launch_description():
     ))
 
 
+    ld.add_action(LogInfo(msg=["Remapping lidar_3d_0_in to: ", LaunchConfiguration('lidar_3d_topic_0_in')]))
+
+
 
     # ########################
     # ## Frame ID Arguments ##
@@ -218,7 +225,6 @@ def generate_launch_description():
     ))
     map_path = LaunchConfiguration('map_path')
 
-    submap_filename = PathJoinSubstitution([map_path, PythonExpression(['"', uav_name, '_submaps.bsm"'])])
 
 
     # ###################################
@@ -227,6 +233,25 @@ def generate_launch_description():
     config_files = [
         os.path.join(this_pkg_path, 'config', 'default.yaml'),
     ]
+
+#     ld.add_action(
+#     Node(
+#         package="mrs_octomap_server",
+#         executable="MrsOctomapServer_Server",  # Replace with the actual executable name
+#         name="MrsOctomapServer_Server",
+#         namespace=uav_name,
+#         output="screen",
+#         parameters=[
+#             {"use_sim_time": use_sim_time},
+#             {"uav_name": uav_name},
+#             {"simulation": simulation},
+#         ],
+#         remappings=[
+#             ("~lidar_3d_0_in", "lidar_3d_topic_0_in"),
+#             ("~octomap_global_full_out", "octomap_global_full"),
+#         ],
+#     )
+# )
 
     ld.add_action(ComposableNodeContainer(
         namespace=uav_name,
@@ -237,8 +262,8 @@ def generate_launch_description():
         composable_node_descriptions=[
             ComposableNode(
                 package=pkg_name,
-                plugin='mrs_octomap_server::octomapServer::OctomapServer',
-                name='octomap_server',
+                plugin='mrs_octomap_server::OctomapServer',
+                name='MrsOctomapServer_Server',
                 parameters=[
                     {'use_sim_time': use_sim_time,
                      'config_file': config_files,
@@ -247,50 +272,54 @@ def generate_launch_description():
                      'simulation': simulation,
                      'world_frame': world_frame,
                      'robot_frame': robot_frame,
-                     'submap_filename': submap_filename,
                      'vizualization/frame_id': world_frame,
                     }],
-                remappings=[
-                    # 3D Lidar
-                    ("~lidar_3d_0_in", "lidar_3d_topic_0_in"),
-                    ("~lidar_3d_1_in", "lidar_3d_topic_1_in"),
-                    ("~lidar_3d_2_in", "lidar_3d_topic_2_in"),
-                    ("~lidar_3d_0_over_max_range_in", "lidar_3d_topic_0_over_max_range_in"),
-                    ("~lidar_3d_1_over_max_range_in", "lidar_3d_topic_1_over_max_range_in"),
-                    ("~lidar_3d_2_over_max_range_in", "lidar_3d_topic_2_over_max_range_in"),
-                    # 2D Lidar
-                    ("~lidar_2d_0_in", "lidar_2d_topic_0_in"),
-                    ("~lidar_2d_1_in", "lidar_2d_topic_1_in"),
-                    ("~lidar_2d_2_in", "lidar_2d_topic_2_in"),
-                    # Depth Camera
-                    ("~depth_camera_0_in", "depth_camera_topic_0_in"),
-                    ("~depth_camera_1_in", "depth_camera_topic_1_in"),
-                    ("~depth_camera_2_in", "depth_camera_topic_2_in"),
-                    ("~depth_camera_0_over_max_range_in", "depth_camera_topic_0_over_max_range_in"),
-                    ("~depth_camera_1_over_max_range_in", "depth_camera_topic_1_over_max_range_in"),
-                    ("~depth_camera_2_over_max_range_in", "depth_camera_topic_2_over_max_range_in"),
-                    # Camera Info
-                    ("~camera_info_0_in", "camera_info_topic_0_in"),
-                    ("~camera_info_1_in", "camera_info_topic_1_in"),
-                    ("~camera_info_2_in", "camera_info_topic_2_in"),
-                    # Other remappings
-                    ("~control_manager_diagnostics_in", "control_manager/diagnostics"),
-                    ("~height_in", "odometry/height"),
-                    ("~clear_box_in", "uav_pose_estimator/clear_box"),
-                    # Topics out
-                    ("~octomap_global_full_out", "~octomap_global_full"),
-                    ("~octomap_global_binary_out", "~octomap_global_binary"),
-                    ("~octomap_local_full_out", "~octomap_local_full"),
-                    ("~octomap_local_binary_out", "~octomap_local_binary"),
-                    # Services
-                    ("~reset_map_in", "~reset_map"),
-                    ("~save_map_in", "~save_map"),
-                    ("~load_map_in", "~load_map"),
-                    
-                ]
+                    remappings=[
+                        # 3D Lidar
+                        ("~lidar_3d_0_in", "lidar_3d_topic_0_in"),
+                        #("~lidar_3d_0_in", LaunchConfiguration('lidar_3d_topic_0_in')),
+                        ("~lidar_3d_1_in", LaunchConfiguration('lidar_3d_topic_1_in')),
+                        ("~lidar_3d_2_in", LaunchConfiguration('lidar_3d_topic_2_in')),
+                        ("~lidar_3d_0_over_max_range_in", LaunchConfiguration('lidar_3d_topic_0_over_max_range_in')),
+                        ("~lidar_3d_1_over_max_range_in", LaunchConfiguration('lidar_3d_topic_1_over_max_range_in')),
+                        ("~lidar_3d_2_over_max_range_in", LaunchConfiguration('lidar_3d_topic_2_over_max_range_in')),
+
+                        # 2D Lidar
+                        ("~lidar_2d_0_in", LaunchConfiguration('lidar_2d_topic_0_in')),
+                        ("~lidar_2d_1_in", LaunchConfiguration('lidar_2d_topic_1_in')),
+                        ("~lidar_2d_2_in", LaunchConfiguration('lidar_2d_topic_2_in')),
+
+                        # Depth Camera
+                        ("~depth_camera_0_in", LaunchConfiguration('depth_camera_topic_0_in')),
+                        ("~depth_camera_1_in", LaunchConfiguration('depth_camera_topic_1_in')),
+                        ("~depth_camera_2_in", LaunchConfiguration('depth_camera_topic_2_in')),
+                        ("~depth_camera_0_over_max_range_in", LaunchConfiguration('depth_camera_topic_0_over_max_range_in')),
+                        ("~depth_camera_1_over_max_range_in", LaunchConfiguration('depth_camera_topic_1_over_max_range_in')),
+                        ("~depth_camera_2_over_max_range_in", LaunchConfiguration('depth_camera_topic_2_over_max_range_in')),
+
+                        # Camera Info
+                        ("~camera_info_0_in", LaunchConfiguration('camera_info_topic_0_in')),
+                        ("~camera_info_1_in", LaunchConfiguration('camera_info_topic_1_in')),
+                        ("~camera_info_2_in", LaunchConfiguration('camera_info_topic_2_in')),
+
+                        # Other remappings
+                        ("~control_manager_diagnostics_in", "control_manager/diagnostics"),
+                        ("~height_in", "odometry/height"),
+                        ("~clear_box_in", "uav_pose_estimator/clear_box"),
+
+                        # Topics out
+                        ("~octomap_global_full_out", "octomap_global_full"),
+                        ("~octomap_global_binary_out", "octomap_global_binary"),
+                        ("~octomap_local_full_out", "octomap_local_full"),
+                        ("~octomap_local_binary_out", "octomap_local_binary"),
+
+                        # Services
+                        ("~reset_map_in", "reset_map"),
+                        ("~save_map_in", "save_map"),
+                        ("~load_map_in", "load_map"),
+                    ]
             )
 
         ],
     ))
     return ld
-    
