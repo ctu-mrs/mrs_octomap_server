@@ -28,57 +28,32 @@ void OctomapServer::onInit() {
 
   /* params //{ */
 
+    // | ----------------------- load files ----------------------- |
+  mrs_lib::ParamLoader param_loader(this->shared_from_this(), this->get_name());
+ 
+  // load custom config
+ 
+  std::string custom_config_path;
+  param_loader.loadParam("custom_config", custom_config_path);
+ 
+  if (custom_config_path != "") {
+    RCLCPP_INFO(node_->get_logger(), "loading custom config '%s", custom_config_path.c_str());
+    param_loader.addYamlFile(custom_config_path);
+  }
+ 
+  // load other configs
+ 
+  std::vector<std::string> config_files;
+  param_loader.loadParam("config_files", config_files);
+ 
+  for (auto config_file : config_files) {
+    RCLCPP_INFO(node_->get_logger(), "loading config file '%s'", config_file.c_str());
+    param_loader.addYamlFile(config_file);
+  }
 
-  mrs_lib::ParamLoader param_loader(shared_from_this(), this->get_name());
-
-  param_loader.loadParam("simulation", _simulation_);
-  param_loader.loadParam("uav_name", _uav_name_);
-
-  param_loader.loadParam("scope_timer/enabled", _scope_timer_enabled_);
-
-  param_loader.loadParam("map_while_grounded", _map_while_grounded_);
-
-  param_loader.loadParam("persistency/enabled", _persistency_enabled_);
-  param_loader.loadParam("persistency/save_time", _persistency_save_time_);
-  param_loader.loadParam("persistency/map_name", _persistency_map_name_);
-  param_loader.loadParam("persistency/align_altitude/enabled", _persistency_align_altitude_enabled_);
-  param_loader.loadParam("persistency/align_altitude/ground_detection_distance", _persistency_align_altitude_distance_);
-  param_loader.loadParam("persistency/align_altitude/robot_height", _robot_height_);
-
-  param_loader.loadParam("global_map/size", _global_map_size_);
-  param_loader.loadParam("global_map/publisher_rate", _global_map_publisher_rate_);
-  param_loader.loadParam("global_map/creation_rate", _global_map_creator_rate_);
-  param_loader.loadParam("global_map/enabled", _global_map_enabled_);
-  param_loader.loadParam("global_map/compress", _global_map_compress_);
-  param_loader.loadParam("global_map/publish_full", _global_map_publish_full_);
-  param_loader.loadParam("global_map/publish_binary", _global_map_publish_binary_);
-
-  param_loader.loadParam("local_map/size/max_width", _local_map_width_max_);
-  param_loader.loadParam("local_map/size/max_height", _local_map_height_max_);
-  param_loader.loadParam("local_map/size/min_width", _local_map_width_min_);
-  param_loader.loadParam("local_map/size/min_height", _local_map_height_min_);
-  param_loader.loadParam("local_map/size/duty_high_threshold", _local_map_duty_high_threshold_);
-  param_loader.loadParam("local_map/size/duty_low_threshold", _local_map_duty_low_threshold_);
-  param_loader.loadParam("local_map/publisher_rate", _local_map_publisher_rate_);
-  param_loader.loadParam("local_map/publish_full", _local_map_publish_full_);
-  param_loader.loadParam("local_map/publish_binary", _local_map_publish_binary_);
 
   local_map_width_  = _local_map_width_max_;
   local_map_height_ = _local_map_height_max_;
-
-  param_loader.loadParam("resolution", octree_resolution_);
-  param_loader.loadParam("world_frame_id", _world_frame_);
-  param_loader.loadParam("robot_frame_id", _robot_frame_);
-
-  param_loader.loadParam("map_path", _map_path_);
-
-  param_loader.loadParam("unknown_rays/update_free_space", _unknown_rays_update_free_space_);
-  param_loader.loadParam("unknown_rays/clear_occupied", _unknown_rays_clear_occupied_);
-  param_loader.loadParam("unknown_rays/ray_distance", _unknown_rays_distance_);
-
-  param_loader.loadParam("sensor_params/2d_lidar/n_sensors", n_sensors_2d_lidar_);
-  param_loader.loadParam("sensor_params/3d_lidar/n_sensors", n_sensors_3d_lidar_);
-  param_loader.loadParam("sensor_params/depth_camera/n_sensors", n_sensors_depth_cam_);
 
   for (int i = 0; i < n_sensors_2d_lidar_; i++) {
 
@@ -297,10 +272,17 @@ void OctomapServer::onInit() {
   shopts.threadsafe         = true;
   shopts.autostart          = true;
 
+  rclcpp::SubscriptionOptions subscription_options = rclcpp::SubscriptionOptions();
+  subscription_options.callback_group = cbgrp_sensors_;
+  shopts.subscription_options = subscription_options;
+  cbgrp_sensors_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
 
   sh_control_manager_diag_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::ControlManagerDiagnostics>(shopts, "~/control_manager_diagnostics_in");
   sh_height_               = mrs_lib::SubscriberHandler<mrs_msgs::msg::Float64Stamped>(shopts, "~/height_in");
   sh_clear_box_            = mrs_lib::SubscriberHandler<mrs_modules_msgs::msg::PoseWithSize>(shopts, "~/clear_box_in");
+
+  //cbgrp_sensors_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);   // a voir
 
   for (int i = 0; i < n_sensors_3d_lidar_; i++) {
 
