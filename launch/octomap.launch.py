@@ -113,12 +113,6 @@ def generate_launch_description():
         description="Path to a custom YAML configuration file. Can be absolute or relative.",
     ))
 
-    custom_config_path = LaunchConfiguration('custom_config')
-    processed_custom_config = IfElseSubstitution(
-            condition=PythonExpression(['"', custom_config_path, '" != "" and not "', custom_config_path, '".startswith("/")']),
-            if_value=PathJoinSubstitution([EnvironmentVariable('PWD'), custom_config_path]),
-            else_value=custom_config_path
-    )
 
     # ############################
     # ## Sensor Topic Arguments ##
@@ -277,30 +271,30 @@ def generate_launch_description():
                 remappings=[
                         # 3D Lidar
                         #("~lidar_3d_0_in", "lidar_3d_topic_0_in"),
-                        ("lidar_3d_0_in", LaunchConfiguration('lidar_3d_topic_0_in')),
-                        ("lidar_3d_1_in", LaunchConfiguration('lidar_3d_topic_1_in')),
-                        ("lidar_3d_2_in", LaunchConfiguration('lidar_3d_topic_2_in')),
-                        ("lidar_3d_0_over_max_range_in", LaunchConfiguration('lidar_3d_topic_0_over_max_range_in')),
-                        ("lidar_3d_1_over_max_range_in", LaunchConfiguration('lidar_3d_topic_1_over_max_range_in')),
-                        ("lidar_3d_2_over_max_range_in", LaunchConfiguration('lidar_3d_topic_2_over_max_range_in')),
+                        ("~/lidar_1d_0_in", '~/lidar_3d_topic_0'),
+                        ("~/lidar_3d_1_in", '~/lidar_3d_topic_1'),
+                        ("~/lidar_3d_2_in", '~/lidar_3d_topic_2'),
+                        ("~/lidar_3d_0_over_max_range_in", '~/lidar_3d_topic_0_over_max_range'),
+                        ("~/lidar_3d_1_over_max_range_in", '~/lidar_3d_topic_1_over_max_range'),
+                        ("~/lidar_3d_2_over_max_range_in", '~/lidar_3d_topic_2_over_max_range'),
 
                         # 2D Lidar
-                        ("lidar_2d_0_in", LaunchConfiguration('lidar_2d_topic_0_in')),
-                        ("lidar_2d_1_in", LaunchConfiguration('lidar_2d_topic_1_in')),
-                        ("lidar_2d_2_in", LaunchConfiguration('lidar_2d_topic_2_in')),
+                        ("~/lidar_2d_0_in", '~/lidar_2d_topic_0'),
+                        ("~/lidar_2d_1_in", '~/lidar_2d_topic_1'),
+                        ("~/lidar_2d_2_in", '~/lidar_2d_topic_2'),
 
                         # Depth Camera
-                        ("depth_camera_0_in", LaunchConfiguration('depth_camera_topic_0_in')),
-                        ("depth_camera_1_in", LaunchConfiguration('depth_camera_topic_1_in')),
-                        ("depth_camera_2_in", LaunchConfiguration('depth_camera_topic_2_in')),
-                        ("depth_camera_0_over_max_range_in", LaunchConfiguration('depth_camera_topic_0_over_max_range_in')),
-                        ("depth_camera_1_over_max_range_in", LaunchConfiguration('depth_camera_topic_1_over_max_range_in')),
-                        ("depth_camera_2_over_max_range_in", LaunchConfiguration('depth_camera_topic_2_over_max_range_in')),
+                        ("~/depth_camera_0_in", '~/depth_camera_topic_0'),
+                        ("~/depth_camera_1_in", '~/depth_camera_topic_1'),
+                        ("~/depth_camera_2_in", '~/depth_camera_topic_2'),
+                        ("~/depth_camera_0_over_max_range_in", '~/depth_camera_topic_0_over_max_range'),
+                        ("~/depth_camera_1_over_max_range_in", '~/depth_camera_topic_1_over_max_range'),
+                        ("~/depth_camera_2_over_max_range_in", '~/depth_camera_topic_2_over_max_range'),
 
                         # Camera Info
-                        ("camera_info_0_in", LaunchConfiguration('camera_info_topic_0_in')),
-                        ("camera_info_1_in", LaunchConfiguration('camera_info_topic_1_in')),
-                        ("camera_info_2_in", LaunchConfiguration('camera_info_topic_2_in')),
+                        ("~/camera_info_0_in", '~/camera_info_topic_0'),
+                        ("~/camera_info_1_in", '~/camera_info_topic_1'),
+                        ("~/camera_info_2_in", '~/camera_info_topic_2'),
 
                         # Other remappings
                         ("control_manager_diagnostics_in", "control_manager/diagnostics"),
@@ -308,15 +302,15 @@ def generate_launch_description():
                         ("clear_box_in", "uav_pose_estimator/clear_box"),
 
                         # Topics out
-                        ("octomap_global_full_out", "octomap_global_full"),
-                        ("octomap_global_binary_out", "octomap_global_binary"),
-                        ("octomap_local_full_out", "octomap_local_full"),
-                        ("octomap_local_binary_out", "octomap_local_binary"),
+                        ("octomap_global_full_out", "~/octomap_global_full"),
+                        ("octomap_global_binary_out", "~/octomap_global_binary"),
+                        ("octomap_local_full_out", "~/octomap_local_full"),
+                        ("octomap_local_binary_out", "~/octomap_local_binary"),
 
                         # Services
-                        ("reset_map_in", "reset_map"),
-                        ("save_map_in", "save_map"),
-                        ("load_map_in", "load_map"),
+                        ("~/reset_map_in", "~/reset_map"),
+                        ("~/save_map_in", "~/save_map"),
+                        ("~/load_map_in", "~/load_map"),
                     ]
             )
 
