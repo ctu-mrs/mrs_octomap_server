@@ -159,6 +159,16 @@ namespace mrs_octomap_server
 
         private:
 
+        std::atomic<bool> is_initialized_ = false;
+        rclcpp::Node::SharedPtr node_;
+        rclcpp::Clock::SharedPtr clock_;
+
+        // | -------------------- callbacks ------------------- |
+
+        //rclcpp::CallbackGroup::SharedPtr cbgrp_main_;
+        //rclcpp::CallbackGroup::SharedPtr cbgrp_sensors_;
+        //rclcpp::CallbackGroup::SharedPtr cbgrp_status_;
+
         bool callbackLoadMap(const std::shared_ptr<mrs_msgs::srv::String::Request> req, std::shared_ptr<mrs_msgs::srv::String::Response> resp);
         bool callbackSaveMap(const std::shared_ptr<mrs_msgs::srv::String::Request> req, std::shared_ptr<mrs_msgs::srv::String::Response> resp);
 
@@ -172,9 +182,7 @@ namespace mrs_octomap_server
         bool loadFromFile(const std::string& filename);
         bool saveToFile(const std::string& filename);
 
-        std::atomic<bool> is_initialized_ = false;
-        rclcpp::Node::SharedPtr node_;
-        rclcpp::Clock::SharedPtr clock_;
+        
 
         // | -------------------- topic subscribers ------------------- |
 

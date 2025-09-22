@@ -26,6 +26,12 @@ void OctomapServer::onInit() {
   clock_ = node_->get_clock();
 
 
+
+  /* Initialize callback groups */
+  //cbgrp_main_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  //cbgrp_sensors_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  //cbgrp_status_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
   /* params //{ */
 
     // | ----------------------- load files ----------------------- |
@@ -262,7 +268,11 @@ void OctomapServer::onInit() {
   pub_map_local_full_     = this->create_publisher<octomap_msgs::msg::Octomap>("octomap_local_full_out", 10);   
   pub_map_local_binary_   = this->create_publisher<octomap_msgs::msg::Octomap>("octomap_local_binary_out", 10);
 
-  //}
+  // pub_map_global_full_ = mrs_lib::PublisherHandler<octomap_msgs::msg::Octomap>("~/octomap_global_full_out");
+  // pub_map_global_binary_ = mrs_lib::PublisherHandler<octomap_msgs::msg::Octomap>("~/octomap_global_binary_out");
+  // pub_map_local_full_ = mrs_lib::PublisherHandler<octomap_msgs::msg::Octomap>("~/octomap_local_full_out");
+  // pub_map_local_binary_ = mrs_lib::PublisherHandler<octomap_msgs::msg::Octomap>("~/octomap_local_binary_out");
+  // //}
 
   /* subscribers //{ */
 
@@ -272,17 +282,16 @@ void OctomapServer::onInit() {
   shopts.threadsafe         = true;
   shopts.autostart          = true;
 
-  rclcpp::SubscriptionOptions subscription_options = rclcpp::SubscriptionOptions();
-  subscription_options.callback_group = cbgrp_sensors_;
-  shopts.subscription_options = subscription_options;
-  cbgrp_sensors_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  // rclcpp::SubscriptionOptions subscription_options = rclcpp::SubscriptionOptions();
+  // subscription_options.callback_group = cbgrp_sensors_;
+  // shopts.subscription_options = subscription_options;
+  // cbgrp_sensors_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
 
   sh_control_manager_diag_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::ControlManagerDiagnostics>(shopts, "~/control_manager_diagnostics_in");
   sh_height_               = mrs_lib::SubscriberHandler<mrs_msgs::msg::Float64Stamped>(shopts, "~/height_in");
   sh_clear_box_            = mrs_lib::SubscriberHandler<mrs_modules_msgs::msg::PoseWithSize>(shopts, "~/clear_box_in");
 
-  //cbgrp_sensors_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);   // a voir
 
   for (int i = 0; i < n_sensors_3d_lidar_; i++) {
 
@@ -348,15 +357,15 @@ void OctomapServer::onInit() {
   /* service servers //{ */
 
   ss_reset_map_ = this->create_service<std_srvs::srv::Empty>(
-            "reset_map_in",
+            "~/reset_map_in",
             std::bind(&OctomapServer::callbackResetMap, this,
                       std::placeholders::_1, std::placeholders::_2));
   ss_save_map_ = this->create_service<mrs_msgs::srv::String>(
-            "save_map_in",
+            "~/save_map_in",
             std::bind(&OctomapServer::callbackSaveMap, this,
                       std::placeholders::_1, std::placeholders::_2));
   ss_load_map_ = this->create_service<mrs_msgs::srv::String>(
-            "load_map_in",
+            "~/load_map_in",
             std::bind(&OctomapServer::callbackLoadMap, this,
                       std::placeholders::_1, std::placeholders::_2));   
 
@@ -366,6 +375,7 @@ void OctomapServer::onInit() {
   mrs_lib::TimerHandlerOptions timer_opts_start;
 
   timer_opts_start.node      = node_;
+  //timer_opts_start.callback_group = cbgrp_sensors_;
   timer_opts_start.autostart = true;
 
   if (_global_map_enabled_) {
