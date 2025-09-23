@@ -116,7 +116,6 @@ install(
   RUNTIME DESTINATION bin
   )
 
-
 install(DIRECTORY include/
   DESTINATION .)
 
@@ -125,9 +124,8 @@ install(
   DESTINATION share/${PROJECT_NAME}
   )
 
-
 install(
-  DIRECTORY config/
+  DIRECTORY config
   DESTINATION share/${PROJECT_NAME}
 )
 

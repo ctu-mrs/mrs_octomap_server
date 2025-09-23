@@ -4,7 +4,7 @@ resolution: 0.4
 
 scope_timer:
   enabled: false
-  file_name: "/tmp/scope_timer_trajectory_generation.txt"
+  log_filename: "/tmp/scope_timer_trajectory_generation.txt"
 
 persistency:
 
@@ -80,7 +80,7 @@ sensor_params:
       free_ray_distance: 15.0 # [m] max distance for free space raycasting
 
       # fallback values used for free space raycasting for missing data, uses pointcloud dimensions from the incoming message by default
-      vertical_fov_angle: deg(90.0)
+      vertical_fov_angle: 1.57
       vertical_rays: 128
       horizontal_rays: 128
 
@@ -100,8 +100,8 @@ sensor_params:
       free_ray_distance: 15.0 # [m] max distance for free space raycasting
 
       # fallback values used for free space raycasting for missing data, uses pointcloud dimensions and camera_info by default
-      horizontal_fov_angle: deg(70.0)
-      vertical_fov_angle: deg(35.0)
+      horizontal_fov_angle: 1.221
+      vertical_fov_angle: 0.61
       horizontal_rays: 80
       vertical_rays: 45
 
@@ -119,8 +119,6 @@ sensor_params:
 
     #   max_range: 9.0 # [m]
     #   horizontal_rays: 40
-
-sensor_model:
 
 sensor_model:
 

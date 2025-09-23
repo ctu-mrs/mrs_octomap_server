@@ -47,6 +47,7 @@
 #include <mrs_lib/subscriber_handler.h>
 #include <mrs_lib/mutex.h>
 #include <mrs_lib/scope_timer.h>
+#include <mrs_lib/publisher_handler.h>
 
 // Messages personnalisés
 // #include <mrs_octomap_server/msg/PoseWithSize.hpp>
@@ -180,9 +181,7 @@ namespace mrs_octomap_server
         void callbackLaserScan(const sensor_msgs::msg::LaserScan::SharedPtr msg);
         void callbackCameraInfo(const sensor_msgs::msg::CameraInfo::ConstSharedPtr msg, const int sensor_id);
         bool loadFromFile(const std::string& filename);
-        bool saveToFile(const std::string& filename);
-
-        
+        bool saveToFile(const std::string& filename);   
 
         // | -------------------- topic subscribers ------------------- |
 
@@ -197,11 +196,16 @@ namespace mrs_octomap_server
 
         // | ----------------------- publishers ----------------------- |
 
+        mrs_lib::PublisherHandler<octomap_msgs::msg::Octomap> pub_map_global_full_;
+        mrs_lib::PublisherHandler<octomap_msgs::msg::Octomap> pub_map_global_binary_;
+        mrs_lib::PublisherHandler<octomap_msgs::msg::Octomap> pub_map_local_full_;
+        mrs_lib::PublisherHandler<octomap_msgs::msg::Octomap> pub_map_local_binary_;
 
-        rclcpp::Publisher<octomap_msgs::msg::Octomap>::SharedPtr pub_map_global_full_;
-        rclcpp::Publisher<octomap_msgs::msg::Octomap>::SharedPtr pub_map_global_binary_;
-        rclcpp::Publisher<octomap_msgs::msg::Octomap>::SharedPtr pub_map_local_full_;
-        rclcpp::Publisher<octomap_msgs::msg::Octomap>::SharedPtr pub_map_local_binary_;
+
+        // rclcpp::Publisher<octomap_msgs::msg::Octomap>::SharedPtr pub_map_global_full_;
+        // rclcpp::Publisher<octomap_msgs::msg::Octomap>::SharedPtr pub_map_global_binary_;
+        // rclcpp::Publisher<octomap_msgs::msg::Octomap>::SharedPtr pub_map_local_full_;
+        // rclcpp::Publisher<octomap_msgs::msg::Octomap>::SharedPtr pub_map_local_binary_;
 
         // | -------------------- service servers -------------------- |
 

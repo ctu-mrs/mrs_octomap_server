@@ -107,110 +107,14 @@ def generate_launch_description():
     ))
     use_sim_time = LaunchConfiguration('use_sim_time')\
     
-    ld.add_action(DeclareLaunchArgument(
-        'custom_config',
-        default_value="",
-        description="Path to a custom YAML configuration file. Can be absolute or relative.",
-    ))
+    # ld.add_action(DeclareLaunchArgument(
+    #     'custom_config',
+    #     default_value="",
+    #     description="Path to a custom YAML configuration file. Can be absolute or relative.",
+    # ))
 
 
-    # ############################
-    # ## Sensor Topic Arguments ##
-    # ############################
-
-    ld.add_action(DeclareLaunchArgument(
-        'lidar_3d_topic_0_in',
-        default_value='~/lidar_3d_topic_0_in',
-        description="3D Lidar topic input 0",
-    ))
-    ld.add_action(DeclareLaunchArgument(
-        'lidar_3d_topic_1_in',
-        default_value='~/lidar_3d_topic_1_in',
-        description="3D Lidar topic input 1",
-    ))
-    ld.add_action(DeclareLaunchArgument(
-        'lidar_3d_topic_2_in',
-        default_value='~/lidar_3d_topic_2_in',
-        description="3D Lidar topic input 2",
-    ))
-    ld.add_action(DeclareLaunchArgument(
-        'lidar_3d_topic_0_over_max_range_in',
-        default_value='~/lidar_3d_topic_0_over_max_range_in',
-        description="3D Lidar topic input 0 for points over max range",
-    ))
-    ld.add_action(DeclareLaunchArgument(
-        'lidar_3d_topic_1_over_max_range_in',
-        default_value='~/lidar_3d_topic_1_over_max_range_in',
-        description="3D Lidar topic input 1 for points over max range",
-    ))
-    ld.add_action(DeclareLaunchArgument(
-        'lidar_3d_topic_2_over_max_range_in',
-        default_value='~/lidar_3d_topic_2_over_max_range_in',
-        description="3D Lidar topic input 2 for points over max range",
-    ))      
-    ld.add_action(DeclareLaunchArgument(
-        'lidar_2d_topic_0_in',
-        default_value='~/lidar_2d_topic_0_in',
-        description="2D Lidar topic input 0",
-    ))
-    ld.add_action(DeclareLaunchArgument(
-        'lidar_2d_topic_1_in',
-        default_value='~/lidar_2d_topic_1_in',
-        description="2D Lidar topic input 1",
-    ))
-    ld.add_action(DeclareLaunchArgument(
-        'lidar_2d_topic_2_in',
-        default_value='~/lidar_2d_topic_2_in',
-        description="2D Lidar topic input 2",
-    ))
-    ld.add_action(DeclareLaunchArgument(
-        'depth_camera_topic_0_in',
-        default_value='~/depth_camera_topic_0_in',
-        description="Depth camera topic input 0",
-    ))
-    ld.add_action(DeclareLaunchArgument(
-        'depth_camera_topic_1_in',
-        default_value='~/depth_camera_topic_1_in',
-        description="Depth camera topic input 1",
-    ))
-    ld.add_action(DeclareLaunchArgument(
-        'depth_camera_topic_2_in',
-        default_value='~/depth_camera_topic_2_in',
-        description="Depth camera topic input 2",
-    ))
-    ld.add_action(DeclareLaunchArgument(
-        'depth_camera_topic_0_over_max_range_in',
-        default_value='~/depth_camera_topic_0_over_max_range_in',
-        description="Depth camera topic input 0 for points over max range",
-    ))
-    ld.add_action(DeclareLaunchArgument(
-        'depth_camera_topic_1_over_max_range_in',
-        default_value='~/depth_camera_topic_1_over_max_range_in',
-        description="Depth camera topic input 1 for points over max range",
-    ))
-    ld.add_action(DeclareLaunchArgument(
-        'depth_camera_topic_2_over_max_range_in',
-        default_value='~/depth_camera_topic_2_over_max_range_in',
-        description="Depth camera topic input 2 for points over max range",
-    ))
-    ld.add_action(DeclareLaunchArgument(
-        'camera_info_topic_0_in',
-        default_value='~/camera_info_topic_0_in',
-        description="Camera info topic input 0",
-    ))
-    ld.add_action(DeclareLaunchArgument(
-        'camera_info_topic_1_in',
-        default_value='~/camera_info_topic_1_in',
-        description="Camera info topic input 1",
-    ))
-    ld.add_action(DeclareLaunchArgument(
-        'camera_info_topic_2_in',
-        default_value='~/camera_info_topic_2_in',
-        description="Camera info topic input 2",
-    ))
-
-
-    ld.add_action(LogInfo(msg=["Remapping lidar_3d_0_in to: ", LaunchConfiguration('lidar_3d_topic_0_in')]))
+    # ld.add_action(LogInfo(msg=["Remapping lidar_3d_0_in to: ", LaunchConfiguration('lidar_3d_topic_0_in')]))
 
 
 
@@ -220,21 +124,6 @@ def generate_launch_description():
     
     world_frame = PythonExpression(['"', uav_name, '/world_origin"']) # Corrected based on your log output
     robot_frame = PythonExpression(['"', uav_name, '/fcu"'])
-
-    # ####################
-    # ## Path Arguments ##
-    # ####################
-
-    ld.add_action(DeclareLaunchArgument(
-        'map_path',
-        default_value=PathJoinSubstitution([EnvironmentVariable('HOME'), 'maps']),
-        description="Directory to save/load maps."
-    ))
-    map_path = LaunchConfiguration('map_path')
-
-
-
-
 
     # ###################################
     # ## Composable Node and Container ##
@@ -260,18 +149,18 @@ def generate_launch_description():
                 name='octomap_server',
                 parameters=[{
                     'use_sim_time': use_sim_time,
-                    'config_file': config_files,
+                    'config_files': config_files,
                     'custom_config': processed_custom_config,
                     'uav_name': uav_name,
                     'simulation': simulation,
-                    'world_frame': world_frame,
-                    'robot_frame': robot_frame,
+                    'world_frame_id': world_frame,
+                    'robot_frame_id': robot_frame,
+                    'map_path': '/tmp/',
                     'vizualization/frame_id': world_frame,
                 }],
                 remappings=[
                         # 3D Lidar
-                        #("~lidar_3d_0_in", "lidar_3d_topic_0_in"),
-                        ("~/lidar_1d_0_in", '~/lidar_3d_topic_0'),
+                        ("~/lidar_3d_0_in", '~/lidar_3d_topic_0'),
                         ("~/lidar_3d_1_in", '~/lidar_3d_topic_1'),
                         ("~/lidar_3d_2_in", '~/lidar_3d_topic_2'),
                         ("~/lidar_3d_0_over_max_range_in", '~/lidar_3d_topic_0_over_max_range'),
@@ -297,15 +186,15 @@ def generate_launch_description():
                         ("~/camera_info_2_in", '~/camera_info_topic_2'),
 
                         # Other remappings
-                        ("control_manager_diagnostics_in", "control_manager/diagnostics"),
-                        ("height_in", "odometry/height"),
-                        ("clear_box_in", "uav_pose_estimator/clear_box"),
+                        ("~/control_manager_diagnostics_in", "~/control_manager/diagnostics"),
+                        ("~/height_in", "~/odometry/height"),
+                        ("~/clear_box_in", "~/uav_pose_estimator/clear_box"),
 
                         # Topics out
-                        ("octomap_global_full_out", "~/octomap_global_full"),
-                        ("octomap_global_binary_out", "~/octomap_global_binary"),
-                        ("octomap_local_full_out", "~/octomap_local_full"),
-                        ("octomap_local_binary_out", "~/octomap_local_binary"),
+                        ("~/octomap_global_full_out", "~/octomap_global_full"),
+                        ("~/octomap_global_binary_out", "~/octomap_global_binary"),
+                        ("~/octomap_local_full_out", "~/octomap_local_full"),
+                        ("~/octomap_local_binary_out", "~/octomap_local_binary"),
 
                         # Services
                         ("~/reset_map_in", "~/reset_map"),
