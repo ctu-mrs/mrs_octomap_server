@@ -138,6 +138,7 @@ def generate_launch_description():
 
     ld.add_action(ComposableNodeContainer(
         namespace=uav_name,
+        #name= uav_name+'_octomap_server_container',
         name='octomap_server_container',
         package='rclcpp_components',
         executable='component_container_mt',
@@ -160,6 +161,7 @@ def generate_launch_description():
                 }],
                 remappings=[
                         # 3D Lidar
+                        #("~/lidar_3d_0_in", '~/lidar/points'),
                         ("~/lidar_3d_0_in", '~/lidar_3d_topic_0'),
                         ("~/lidar_3d_1_in", '~/lidar_3d_topic_1'),
                         ("~/lidar_3d_2_in", '~/lidar_3d_topic_2'),
@@ -206,3 +208,98 @@ def generate_launch_description():
         ],
     ))
     return ld
+
+
+# Octomap_node = ComposableNode(
+#         package=pkg_name,
+#         plugin='mrs_octomap_server::OctomapServer',
+#         namespace=uav_name,
+#         name='octomap_server',
+#         parameters=[{
+#             'use_sim_time': use_sim_time,
+#             'config_files': config_files,
+#             'custom_config': processed_custom_config,
+#             'uav_name': uav_name,
+#             'simulation': simulation,
+#             'world_frame_id': world_frame,
+#             'robot_frame_id': robot_frame,
+#             'map_path': '/tmp/',
+#             'vizualization/frame_id': world_frame,
+#             'topic_prefix': [uav_name, '/'],
+#         }],
+#         remappings=[
+#             # 3D Lidar
+#             #("~/lidar_3d_0_in", '~/lidar/points'),
+#             ("~/lidar_3d_0_in", '~/lidar_3d_topic_0'),
+#             ("~/lidar_3d_1_in", '~/lidar_3d_topic_1'),
+#             ("~/lidar_3d_2_in", '~/lidar_3d_topic_2'),
+#             ("~/lidar_3d_0_over_max_range_in", '~/lidar_3d_topic_0_over_max_range'),
+#             ("~/lidar_3d_1_over_max_range_in", '~/lidar_3d_topic_1_over_max_range'),
+#             ("~/lidar_3d_2_over_max_range_in", '~/lidar_3d_topic_2_over_max_range'),
+
+#             # 2D Lidar
+#             ("~/lidar_2d_0_in", '~/lidar_2d_topic_0'),
+#             ("~/lidar_2d_1_in", '~/lidar_2d_topic_1'),
+#             ("~/lidar_2d_2_in", '~/lidar_2d_topic_2'),
+
+#             # Depth Camera
+#             ("~/depth_camera_0_in", '~/depth_camera_topic_0'),
+#             ("~/depth_camera_1_in", '~/depth_camera_topic_1'),
+#             ("~/depth_camera_2_in", '~/depth_camera_topic_2'),
+#             ("~/depth_camera_0_over_max_range_in", '~/depth_camera_topic_0_over_max_range'),
+#             ("~/depth_camera_1_over_max_range_in", '~/depth_camera_topic_1_over_max_range'),
+#             ("~/depth_camera_2_over_max_range_in", '~/depth_camera_topic_2_over_max_range'),
+
+#             # Camera Info
+#             ("~/camera_info_0_in", '~/camera_info_topic_0'),
+#             ("~/camera_info_1_in", '~/camera_info_topic_1'),
+#             ("~/camera_info_2_in", '~/camera_info_topic_2'),
+
+#             # Other remappings
+#             ("~/control_manager_diagnostics_in", "~/control_manager/diagnostics"),
+#             ("~/height_in", "~/odometry/height"),
+#             ("~/clear_box_in", "~/uav_pose_estimator/clear_box"),
+
+#             # Topics out
+#             ("~/octomap_global_full_out", "~/octomap_global_full"),
+#             ("~/octomap_global_binary_out", "~/octomap_global_binary"),
+#             ("~/octomap_local_full_out", "~/octomap_local_full"),
+#             ("~/octomap_local_binary_out", "~/octomap_local_binary"),
+
+#             # Services
+#             ("~/reset_map_in", "~/reset_map"),
+#             ("~/save_map_in", "~/save_map"),
+#             ("~/load_map_in", "~/load_map"),
+#         ]
+#     )
+
+#     load_into_existing = LoadComposableNodes(
+#         target_container=container_name,
+#         composable_node_descriptions=[Octomap_node],
+#         condition=UnlessCondition(standalone)
+#     )
+#     ld.add_action(load_into_existing)
+
+
+
+
+#     standalone_container = ComposableNodeContainer(
+#         namespace=uav_name,
+#         #name= uav_name + '_octomap_server_container',
+#         name = 'octomap_server_container',
+#         #name='octomap_server_container',
+#         package='rclcpp_components',
+#         executable='component_container_mt',
+#         output='screen',
+#         arguments=['--ros-args', '--log-level', LaunchConfiguration('log_level')],
+#         composable_node_descriptions=[Octomap_node],
+#         parameters=[
+#             {'use_intra_process_comms': True},
+#             {'thread_num': os.cpu_count()},
+#             {'use_sim_time': use_sim_time},
+#         ],
+#         condition=IfCondition(standalone)
+#     )
+#     ld.add_action(standalone_container)
+
+#     return ld

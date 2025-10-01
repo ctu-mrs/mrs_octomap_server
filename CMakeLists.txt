@@ -20,20 +20,7 @@ if(${USE_ROS_TIMER})
   MESSAGE(WARNING "[mrs_uav_autostart]: Compiling with ROS Timers. This can cause high CPU load in runtime.")
 endif()
 
-# set the compile options to show code warnings
-if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra)
-endif()
 
-if(ENABLE_COVERAGE)
-  message(WARNING "building for coverage, the performance might be limited")
-
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --coverage -fprofile-arcs")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage -fprofile-arcs")
-
-  add_definitions("-O1")
-  add_definitions("-g")
-endif()
 
 # Find dependencies
 set(DEPENDENCIES
