@@ -1,28 +1,22 @@
 /* includes //{ */
-// Octomap
 #include <octomap/OcTreeNode.h>
 #include <octomap/octomap.h>
 #include <octomap/OcTreeKey.h>
 
-// Messages ROS2
 #include <geometry_msgs/msg/vector3.hpp>
 #include <geometry_msgs/msg/point.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 
-//replace laser_geometry
 #include <laser_geometry/laser_geometry.hpp>  
 
-// Messages de capteurs
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/point_cloud2_iterator.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <sensor_msgs/msg/camera_info.hpp>
 
-// Services ROS2
 #include <std_srvs/srv/empty.hpp>
 #include <std_srvs/srv/trigger.hpp>
 
-// PCL
 #include <pcl/conversions.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl_conversions/pcl_conversions.h>
@@ -31,15 +25,11 @@
 #include <pcl/filters/statistical_outlier_removal.h>
 #include <pcl/filters/crop_box.h>
 
-// pcl_ros n'existe pas en ROS2, utilisez directement PCL et tf2 pour les transformations
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
-
-// Messages Octomap
 #include <octomap_msgs/srv/bounding_box_query.hpp>
 #include <octomap_msgs/conversions.h>
 
-// MRS Lib
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/transformer.h>
 #include <mrs_lib/subscriber_handler.h>
@@ -47,19 +37,14 @@
 #include <mrs_lib/scope_timer.h>
 #include <mrs_lib/publisher_handler.h>
 
-// Messages personnalisés
-// #include <mrs_octomap_server/msg/PoseWithSize.hpp>
 #include <mrs_modules_msgs/msg/pose_with_size.hpp>
-
 
 #include <mrs_octomap_server/conversions.h>
 
-// Messages MRS
 #include <mrs_msgs/msg/control_manager_diagnostics.hpp>
 #include <mrs_msgs/msg/float64_stamped.hpp>
 #include <mrs_msgs/srv/string.hpp>
 
-// Eigen
 #include <Eigen/Geometry>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
@@ -367,7 +352,8 @@ void OctomapServer::onInit() {
 
 
 
-  /* Initialize callback groups */
+  /* Initialize callback groups
+    Looks non usefull */
   //cbgrp_main_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   //cbgrp_sensors_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   //cbgrp_status_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
@@ -655,11 +641,6 @@ void OctomapServer::onInit() {
   pub_map_local_full_     = mrs_lib::PublisherHandler<octomap_msgs::msg::Octomap>(phopts, "~/octomap_local_full_out");
   pub_map_local_binary_   = mrs_lib::PublisherHandler<octomap_msgs::msg::Octomap>(phopts, "~/octomap_local_binary_out");
 
-  // pub_map_global_full_    = this->create_publisher<octomap_msgs::msg::Octomap>("~/octomap_global_full_out", 10);
-  // pub_map_global_binary_  = this->create_publisher<octomap_msgs::msg::Octomap>("~/octomap_global_binary_out", 10);   
-  // pub_map_local_full_     = this->create_publisher<octomap_msgs::msg::Octomap>("~/octomap_local_full_out", 10);   
-  // pub_map_local_binary_   = this->create_publisher<octomap_msgs::msg::Octomap>("~/octomap_local_binary_out", 10);
-
   //}
 
   /* subscribers //{ */
@@ -669,12 +650,6 @@ void OctomapServer::onInit() {
   shopts.no_message_timeout = mrs_lib::no_timeout;
   shopts.threadsafe         = true;
   shopts.autostart          = true;
-
-  // rclcpp::SubscriptionOptions subscription_options = rclcpp::SubscriptionOptions();
-  // subscription_options.callback_group = cbgrp_sensors_;
-  // shopts.subscription_options = subscription_options;
-  // cbgrp_sensors_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-
 
   sh_control_manager_diag_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::ControlManagerDiagnostics>(shopts, "~/control_manager_diagnostics_in");
   sh_height_               = mrs_lib::SubscriberHandler<mrs_msgs::msg::Float64Stamped>(shopts, "~/height_in");
@@ -687,14 +662,12 @@ void OctomapServer::onInit() {
 //ss << "~/lidar_3d_" << i << "_in";
     ss << "/uav1/lidar/points";
 
-    // std::function<void(const sensor_msgs::msg::PointCloud2::SharedPtr, const SensorType_t, const int, const std::string, const bool)> callback_fcn = 
+    
     auto callback = [this, i, topic = ss.str()](const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) {
       this->callback3dLidarCloud2(msg, LIDAR_3D, i, topic, false);
     };
     sh_3dlaser_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(shopts, ss.str(), callback));
-    //sh_3dlaser_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::PointCloud2>(shopts, ss.str(), std::bind(&OctomapServer::callback3dLidarCloud2, this, std::placeholders::_1, LIDAR_3D, i, ss.str(), false)));
-    //sh_3dlaser_pc2_.push_back(mrs_lib::SubscribeHandler<sensor_msgs::PointCloud2>(shopts, ss.str(), ros::Duration(2.0), std::bind(&LososServer::callback3dLidarCloud2, this, std::placeholders::_1, LIDAR_3D, i, ss.str(), false)));
-
+    
 
     std::stringstream ss2;
     ss2 << "~/lidar_3d_" << i << "_over_max_range_in";
@@ -864,14 +837,13 @@ void OctomapServer::callbackLaserScan(const sensor_msgs::msg::LaserScan::SharedP
 
     } else {
 
-      rclcpp::Time last_time = sh_control_manager_diag_.lastMsgTime();  //need modifications
+      rclcpp::Time last_time = sh_control_manager_diag_.lastMsgTime();  
 
       if ((this->now() - last_time).seconds() > 1.0) {
         RCLCPP_WARN_THROTTLE(this->get_logger(),*this->get_clock(),1000, "control manager diagnostics too old, can not integrate data!");
         return;
       }
 
-      // TODO is this the best option?
       if (!sh_control_manager_diag_.getMsg()->flying_normally) {
         RCLCPP_WARN_THROTTLE(this->get_logger(),*this->get_clock(),1000, "not flying normally, therefore, not integrating data");
         return;
@@ -1009,7 +981,7 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
 
 
 
-  double max_range = 0.0;     //a voir pour debug
+  double max_range = 0.0;     //a voir pour debug (init to avoid build error message)
 
   if (!pcl_over_max_range) {
 
@@ -1334,7 +1306,7 @@ void OctomapServer::timerGlobalMapPublisher() {
 
     octomap_msgs::msg::Octomap map;
     map.header.frame_id = _world_frame_;
-    map.header.stamp    = this->now();  // TODO
+    map.header.stamp    = this->now();  
 
     bool success = false;
 
@@ -1357,7 +1329,7 @@ void OctomapServer::timerGlobalMapPublisher() {
 
     octomap_msgs::msg::Octomap map;
     map.header.frame_id = _world_frame_;
-    map.header.stamp    = this->now();  // TODO
+    map.header.stamp    = this->now(); 
 
     bool success = false;
 
@@ -1796,7 +1768,7 @@ void OctomapServer::insertPointCloud(
   box_filter.setMin(min_point);
   box_filter.setMax(max_point);
   box_filter.setInputCloud(cloud);
-  box_filter.setNegative(true);  // Remove points inside the box
+  box_filter.setNegative(true); 
   box_filter.filter(*filtered_cloud);
 
   // Use the filtered cloud for the rest of the function
