@@ -29,6 +29,7 @@
 #include <pcl/common/transforms.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/statistical_outlier_removal.h>
+#include <pcl/filters/crop_box.h>
 
 // pcl_ros n'existe pas en ROS2, utilisez directement PCL et tf2 pour les transformations
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
@@ -297,6 +298,8 @@ namespace mrs_octomap_server
     bool   _unknown_rays_update_free_space_;
     bool   _unknown_rays_clear_occupied_;
     double _unknown_rays_distance_;
+
+    float box_size = 2.0f;
 
     laser_geometry::LaserProjection projector_;
 
@@ -1754,229 +1757,195 @@ void OctomapServer::timerAltitudeAlignment() {
 
 /* insertPointCloud() //{ */
 
-void OctomapServer::insertPointCloud(const geometry_msgs::msg::Vector3& sensorOriginTf, const PCLPointCloud::ConstPtr& cloud,
-                                     const PCLPointCloud::ConstPtr& free_vectors_cloud, double free_ray_distance, bool unknown_clear_occupied) {
-
-  mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer(node_,"OctomapServer::timerInsertPointCloud", scope_timer_logger_, _scope_timer_enabled_);
-
+void OctomapServer::insertPointCloud(
+    const geometry_msgs::msg::Vector3& sensorOriginTf,
+    const PCLPointCloud::ConstPtr& cloud,
+    const PCLPointCloud::ConstPtr& free_vectors_cloud,
+    double free_ray_distance,
+    bool unknown_clear_occupied
+) {
+  mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer(node_, "OctomapServer::timerInsertPointCloud", scope_timer_logger_, _scope_timer_enabled_);
   rclcpp::Time time_start = this->now();
-
   std::scoped_lock lock(mutex_octree_local_);
-
   auto [local_map_width, local_map_height] = mrs_lib::get_mutexed(mutex_local_map_dimensions_, local_map_width_, local_map_height_);
-
   const octomap::point3d sensor_origin = octomap::pointTfToOctomap(sensorOriginTf);
 
-  //  here decimate the pointcloud
+  //Here decimate the pointCloud
 
-  //  here remove the points belonging to the drone around sensor_origin
+  PCLPointCloud::Ptr filtered_cloud(new PCLPointCloud);
+  pcl::VoxelGrid<pcl::PointXYZ> voxel_filter;
+  voxel_filter.setInputCloud(cloud);
+  voxel_filter.setLeafSize(0.1f, 0.1f, 0.1f);  // Adjust the leaf size as needed (e.g., 0.1 meters)
+  voxel_filter.filter(*filtered_cloud);
 
+
+  // Remove points around the drone
+  pcl::CropBox<pcl::PointXYZ> box_filter;
+  Eigen::Vector4f min_point(
+      sensor_origin.x() - box_size / 2.0f,
+      sensor_origin.y() - box_size / 2.0f,
+      sensor_origin.z() - box_size / 2.0f,
+      1.0f
+  );
+  Eigen::Vector4f max_point(
+      sensor_origin.x() + box_size / 2.0f,
+      sensor_origin.y() + box_size / 2.0f,
+      sensor_origin.z() + box_size / 2.0f,
+      1.0f
+  );
+  box_filter.setMin(min_point);
+  box_filter.setMax(max_point);
+  box_filter.setInputCloud(cloud);
+  box_filter.setNegative(true);  // Remove points inside the box
+  box_filter.filter(*filtered_cloud);
+
+  // Use the filtered cloud for the rest of the function
   const float free_space_ray_len = std::min(float(free_ray_distance), float(sqrt(2 * pow(local_map_width / 2.0, 2) + pow(local_map_height / 2.0, 2))));
-
   octomap::KeySet occupied_cells;
   octomap::KeySet free_cells;
   octomap::KeySet free_ends;
 
-  // all measured points: make it free on ray, occupied on endpoint:
-  for (PCLPointCloud::const_iterator it = cloud->begin(); it != cloud->end(); ++it) {
-
+  // All measured points: make it free on ray, occupied on endpoint
+  for (PCLPointCloud::const_iterator it = filtered_cloud->begin(); it != filtered_cloud->end(); ++it) {
     if (!(std::isfinite(it->x) && std::isfinite(it->y) && std::isfinite(it->z))) {
       continue;
     }
-
     octomap::point3d measured_point(it->x, it->y, it->z);
-    const float      point_distance = float((measured_point - sensor_origin).norm());
-
+    const float point_distance = float((measured_point - sensor_origin).norm());
     octomap::OcTreeKey key;
     if (octree_local_->coordToKeyChecked(measured_point, key)) {
       occupied_cells.insert(key);
     }
-
-    // move end point to distance min(free space ray len, current distance)
+    // Move end point to distance min(free space ray len, current distance)
     measured_point = sensor_origin + (measured_point - sensor_origin).normalize() * std::min(free_space_ray_len, point_distance);
-
     octomap::OcTreeKey measured_key = octree_local_->coordToKey(measured_point);
-
     free_ends.insert(measured_key);
   }
 
   // FREE VECTORS
   for (PCLPointCloud::const_iterator it = free_vectors_cloud->begin(); it != free_vectors_cloud->end(); ++it) {
-
     if (!(std::isfinite(it->x) && std::isfinite(it->y) && std::isfinite(it->z))) {
       continue;
     }
-
     octomap::point3d measured_point(it->x, it->y, it->z);
-    const float      point_distance = float((measured_point - sensor_origin).norm());
-
+    const float point_distance = float((measured_point - sensor_origin).norm());
     octomap::KeyRay keyRay;
-
-    // move end point to distance min(free space ray len, current distance)
+    // Move end point to distance min(free space ray len, current distance)
     measured_point = sensor_origin + (measured_point - sensor_origin).normalize() * std::min(free_space_ray_len, point_distance);
-
-    // check if the ray intersects a cell in the occupied list
+    // Check if the ray intersects a cell in the occupied list
     if (octree_local_->computeRayKeys(sensor_origin, measured_point, keyRay)) {
-
       octomap::KeyRay::iterator alterantive_ray_end = keyRay.end();
-
       if (!unknown_clear_occupied) {
-
         for (octomap::KeyRay::iterator it2 = keyRay.begin(), end = keyRay.end(); it2 != end; ++it2) {
-
-          // check if the cell is occupied in the map
+          // Check if the cell is occupied in the map
           auto node = octree_local_->search(*it2);
-
           if (node && octree_local_->isNodeOccupied(node)) {
-
             if (it2 == keyRay.begin()) {
-              alterantive_ray_end = keyRay.begin();  // special case
+              alterantive_ray_end = keyRay.begin();  // Special case
             } else {
               alterantive_ray_end = it2 - 1;
             }
-
             break;
           }
         }
       }
-
       free_cells.insert(keyRay.begin(), alterantive_ray_end);
     }
   }
 
-  // for FREE RAY ENDS
+  // For FREE RAY ENDS
   for (octomap::KeySet::iterator it = free_ends.begin(), end = free_ends.end(); it != end; ++it) {
-
     octomap::point3d coords = octree_local_->keyToCoord(*it);
-
     octomap::KeyRay key_ray;
     if (octree_local_->computeRayKeys(sensor_origin, coords, key_ray)) {
-
       octomap::KeyRay::iterator alterantive_ray_end = key_ray.end();
-
       for (octomap::KeyRay::iterator it2 = key_ray.begin(), end = key_ray.end(); it2 != end; ++it2) {
-
         if (occupied_cells.count(*it2)) {
-
           if (it2 == key_ray.begin()) {
-            alterantive_ray_end = key_ray.begin();  // special case
+            alterantive_ray_end = key_ray.begin();  // Special case
           } else {
             alterantive_ray_end = it2 - 1;
           }
-
           break;
         }
       }
-
       free_cells.insert(key_ray.begin(), alterantive_ray_end);
     }
   }
 
-  octomap::OcTreeNode* root = octree_local_->getRoot();
-
-  bool got_root = root ? true : false;
-
-  if (!got_root) {
-    octomap::OcTreeKey key = octree_local_->coordToKey(0, 0, 0, octree_local_->getTreeDepth());
-    octree_local_->setNodeValue(key, octomap::logodds(0.0));
-  }
-
   // FREE CELLS
   for (octomap::KeySet::iterator it = free_cells.begin(), end = free_cells.end(); it != end; ++it) {
-
     octree_local_->updateNode(*it, octree_local_->getProbMissLog());
   }
 
   // OCCUPIED CELLS
-  for (octomap::KeySet::iterator it = occupied_cells.begin(), end = occupied_cells.end(); it != end; it++) {
-
+  for (octomap::KeySet::iterator it = occupied_cells.begin(), end = occupied_cells.end(); it != end; ++it) {
     octree_local_->updateNode(*it, octree_local_->getProbHitLog());
   }
 
-  /* octomap::OcTreeKey robot_key = octree_local_->coordToKey(robotOriginTf.x, robotOriginTf.y, robotOriginTf.z); */
-  /* octree_local_->updateNode(robot_key, false); */
-
   // CROP THE MAP AROUND THE ROBOT
   {
-
-    mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer(node_,"OctomapServer::localMapCopy", scope_timer_logger_, _scope_timer_enabled_);
-
+    mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer(node_, "OctomapServer::localMapCopy", scope_timer_logger_, _scope_timer_enabled_);
     auto [local_map_width, local_map_height] = mrs_lib::get_mutexed(mutex_local_map_dimensions_, local_map_width_, local_map_height_);
-
-    float x        = sensor_origin.x();
-    float y        = sensor_origin.y();
-    float z        = sensor_origin.z();
-    float width_2  = local_map_width / float(2.0);
+    float x = sensor_origin.x();
+    float y = sensor_origin.y();
+    float z = sensor_origin.z();
+    float width_2 = local_map_width / float(2.0);
     float height_2 = local_map_height / float(2.0);
-
     octomap::point3d roi_min(x - width_2, y - width_2, z - height_2);
     octomap::point3d roi_max(x + width_2, y + width_2, z + height_2);
-
     std::shared_ptr<OcTree_t> from;
-
     if (octree_local_idx_ == 0) {
-      from              = octree_local_0_;
-      octree_local_     = octree_local_1_;
+      from = octree_local_0_;
+      octree_local_ = octree_local_1_;
       octree_local_idx_ = 1;
     } else {
-      from              = octree_local_1_;
-      octree_local_     = octree_local_0_;
+      from = octree_local_1_;
+      octree_local_ = octree_local_0_;
       octree_local_idx_ = 0;
     }
-
     octree_local_->clear();
-
     copyInsideBBX2(from, octree_local_, roi_min, roi_max);
   }
 
-  /* set free space in the bounding box specified by clear_box topic */ /*//{*/
-  {
-    // TODO mutex?
-    if (sh_clear_box_.hasMsg()) {
-      mrs_modules_msgs::msg::PoseWithSize pws = *sh_clear_box_.getMsg();
-      if ((this->now() - pws.header.stamp).seconds() < 1.0) {
-        // transform the pose to octomap frame
-        geometry_msgs::msg::PoseStamped pose_stamped;
-        pose_stamped.header = pws.header;
-        pose_stamped.pose   = pws.pose;
-        auto res            = transformer_->transformSingle(pose_stamped, _world_frame_);
-        if (res) {
-          auto pose = res.value();
+  // Set free space in the bounding box specified by clear_box topic
+  if (sh_clear_box_.hasMsg()) {
+    mrs_modules_msgs::msg::PoseWithSize pws = *sh_clear_box_.getMsg();
+    if ((this->now() - pws.header.stamp).seconds() < 1.0) {
+      geometry_msgs::msg::PoseStamped pose_stamped;
+      pose_stamped.header = pws.header;
+      pose_stamped.pose = pws.pose;
+      auto res = transformer_->transformSingle(pose_stamped, _world_frame_);
+      if (res) {
+        auto pose = res.value();
           // calculate bounding box around the odometry
-          double resolution = octree_local_->getResolution();
-          double min_x      = pose.pose.position.x - pws.width / 2 - resolution;
-          double max_x      = pose.pose.position.x + pws.width / 2 + resolution;
-          double min_y      = pose.pose.position.y - pws.width / 2 - resolution;
-          double max_y      = pose.pose.position.y + pws.width / 2 + resolution;
-          double min_z      = pose.pose.position.z - pws.height / 2 - resolution;
-          double max_z      = pose.pose.position.z + pws.height / 2 + resolution;
-          double step       = resolution / 2;
-          // set the values in the octree
-          for (double x = min_x; x < max_x; x += step) {
-            for (double y = min_y; y < max_y; y += step) {
-              for (double z = min_z; z < max_z; z += step) {
-                octree_local_->setNodeValue(x, y, z, octomap::logodds(0.0));
-              }
+        double resolution = octree_local_->getResolution();
+        double min_x = pose.pose.position.x - pws.width / 2 - resolution;
+        double max_x = pose.pose.position.x + pws.width / 2 + resolution;
+        double min_y = pose.pose.position.y - pws.width / 2 - resolution;
+        double max_y = pose.pose.position.y + pws.width / 2 + resolution;
+        double min_z = pose.pose.position.z - pws.height / 2 - resolution;
+        double max_z = pose.pose.position.z + pws.height / 2 + resolution;
+        double step = resolution / 2;
+        for (double x = min_x; x < max_x; x += step) {
+          for (double y = min_y; y < max_y; y += step) {
+            for (double z = min_z; z < max_z; z += step) {
+              octree_local_->setNodeValue(x, y, z, octomap::logodds(0.0));
             }
           }
-        } else {
-          RCLCPP_WARN_THROTTLE(this->get_logger(),*this->get_clock(),1000, "Unable to transform the pose to be cleared from frame %s to frame %s.", pws.header.frame_id.c_str(),
-                            _world_frame_.c_str());
         }
       } else {
-        RCLCPP_WARN_THROTTLE(this->get_logger(),*this->get_clock(),1000, "Latest pose from clear_box is too old - diff from now: %.3f", (this->now() - pws.header.stamp).seconds());
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Unable to transform the pose to be cleared from frame %s to frame %s.", pws.header.frame_id.c_str(), _world_frame_.c_str());
       }
+    } else {
+      RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Latest pose from clear_box is too old - diff from now: %.3f", (this->now() - pws.header.stamp).seconds());
     }
   }
-  /*//}*/
 
   octree_local_->setNodeValue(sensor_origin.x(), sensor_origin.y(), sensor_origin.z(), octomap::logodds(0.0));
-
   rclcpp::Time time_end = this->now();
-
   {
     std::scoped_lock lock(mutex_local_map_duty_);
-
     local_map_duty_ += (time_end - time_start).seconds();
   }
 }
