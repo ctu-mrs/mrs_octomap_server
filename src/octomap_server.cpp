@@ -839,7 +839,7 @@ void OctomapServer::callbackLaserScan(const sensor_msgs::msg::LaserScan::SharedP
 
       rclcpp::Time last_time = sh_control_manager_diag_.lastMsgTime();  
 
-      if ((this->now() - last_time).seconds() > 1.0) {
+      if ((clock_->now() - last_time).seconds() > 1.0) {
         RCLCPP_WARN_THROTTLE(this->get_logger(),*this->get_clock(),1000, "control manager diagnostics too old, can not integrate data!");
         return;
       }
@@ -943,7 +943,7 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
 
       rclcpp::Time last_time = sh_control_manager_diag_.lastMsgTime();
 
-      if ((this->now() - last_time).seconds() > 1.0) {
+      if ((clock_->now() - last_time).seconds() > 1.0) {
         RCLCPP_WARN_THROTTLE(this->get_logger(),*this->get_clock(),1000, "control manager diagnostics too old, can not integrate data!");
         return;
       }
@@ -957,7 +957,7 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
 
   sensor_msgs::msg::PointCloud2::ConstSharedPtr cloud = msg;
 
-  rclcpp::Time time_start = this->now();
+  rclcpp::Time time_start = clock_->now();
 
   PCLPointCloud::Ptr pc              = pcl::make_shared<PCLPointCloud>();
   PCLPointCloud::Ptr free_vectors_pc = pcl::make_shared<PCLPointCloud>();
@@ -1174,7 +1174,7 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
   {
     std::scoped_lock lock(mutex_avg_time_cloud_insertion_);
 
-    rclcpp::Time time_end = this->now();
+    rclcpp::Time time_end = clock_->now();
 
     double exec_duration = (time_end - time_start).seconds();
 
@@ -1306,7 +1306,7 @@ void OctomapServer::timerGlobalMapPublisher() {
 
     octomap_msgs::msg::Octomap map;
     map.header.frame_id = _world_frame_;
-    map.header.stamp    = this->now();  
+    map.header.stamp    = clock_->now();  
 
     bool success = false;
 
@@ -1329,7 +1329,7 @@ void OctomapServer::timerGlobalMapPublisher() {
 
     octomap_msgs::msg::Octomap map;
     map.header.frame_id = _world_frame_;
-    map.header.stamp    = this->now(); 
+    map.header.stamp    = clock_->now(); 
 
     bool success = false;
 
@@ -1443,7 +1443,7 @@ void OctomapServer::timerLocalMapPublisher() {
 
     octomap_msgs::msg::Octomap map;
     map.header.frame_id = _world_frame_;
-    map.header.stamp    = this->now(); 
+    map.header.stamp    = clock_->now(); 
 
     bool success = false;
 
@@ -1466,7 +1466,7 @@ void OctomapServer::timerLocalMapPublisher() {
 
     octomap_msgs::msg::Octomap map;
     map.header.frame_id = _world_frame_;
-    map.header.stamp    = this->now();
+    map.header.stamp    = clock_->now();
 
     bool success = false;
 
@@ -1560,7 +1560,7 @@ void OctomapServer::timerPersistency() {
 
     rclcpp::Time last_time = sh_control_manager_diag_.lastMsgTime();
 
-    if ((this->now() - last_time).seconds() > 1.0) {
+    if ((clock_->now() - last_time).seconds() > 1.0) {
       RCLCPP_WARN_THROTTLE(this->get_logger(),*this->get_clock(),1000, "control manager diagnostics too old, won't save the map automatically!");
       return;
     }
@@ -1605,7 +1605,7 @@ void OctomapServer::timerAltitudeAlignment() {
 
     rclcpp::Time last_time = sh_control_manager_diag_.lastMsgTime();
 
-    if ((this->now() - last_time).seconds() > 1.0) {
+    if ((clock_->now() - last_time).seconds() > 1.0) {
       RCLCPP_WARN_THROTTLE(this->get_logger(),*this->get_clock(),1000, "control manager diagnostics too old, won't save the map automatically!");
       return;
     }
@@ -1621,7 +1621,7 @@ void OctomapServer::timerAltitudeAlignment() {
 
     rclcpp::Time last_time = sh_height_.lastMsgTime();
 
-    if ((this->now() - last_time).seconds() < 1.0) {
+    if ((clock_->now() - last_time).seconds() < 1.0) {
       got_height = true;
     }
   }
@@ -1737,7 +1737,7 @@ void OctomapServer::insertPointCloud(
     bool unknown_clear_occupied
 ) {
   mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer(node_, "OctomapServer::timerInsertPointCloud", scope_timer_logger_, _scope_timer_enabled_);
-  rclcpp::Time time_start = this->now();
+  rclcpp::Time time_start = clock_->now();
   std::scoped_lock lock(mutex_octree_local_);
   auto [local_map_width, local_map_height] = mrs_lib::get_mutexed(mutex_local_map_dimensions_, local_map_width_, local_map_height_);
   const octomap::point3d sensor_origin = octomap::pointTfToOctomap(sensorOriginTf);
@@ -1883,7 +1883,7 @@ void OctomapServer::insertPointCloud(
   // Set free space in the bounding box specified by clear_box topic
   if (sh_clear_box_.hasMsg()) {
     mrs_modules_msgs::msg::PoseWithSize pws = *sh_clear_box_.getMsg();
-    if ((this->now() - pws.header.stamp).seconds() < 1.0) {
+    if ((clock_->now() - pws.header.stamp).seconds() < 1.0) {
       geometry_msgs::msg::PoseStamped pose_stamped;
       pose_stamped.header = pws.header;
       pose_stamped.pose = pws.pose;
@@ -1910,12 +1910,12 @@ void OctomapServer::insertPointCloud(
         RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Unable to transform the pose to be cleared from frame %s to frame %s.", pws.header.frame_id.c_str(), _world_frame_.c_str());
       }
     } else {
-      RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Latest pose from clear_box is too old - diff from now: %.3f", (this->now() - pws.header.stamp).seconds());
+      RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Latest pose from clear_box is too old - diff from now: %.3f", (clock_->now() - pws.header.stamp).seconds());
     }
   }
 
   octree_local_->setNodeValue(sensor_origin.x(), sensor_origin.y(), sensor_origin.z(), octomap::logodds(0.0));
-  rclcpp::Time time_end = this->now();
+  rclcpp::Time time_end = clock_->now();
   {
     std::scoped_lock lock(mutex_local_map_duty_);
     local_map_duty_ += (time_end - time_start).seconds();
@@ -2356,7 +2356,7 @@ void OctomapServer::timeoutGeneric(const std::string& topic, const rclcpp::Time&
       1000,
       "not receiving '%s' for %.3f s",
       topic.c_str(),
-      (this->now() - last_msg).seconds()
+      (clock_->now() - last_msg).seconds()
   );
 }
 /*//}*/
