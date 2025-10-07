@@ -834,7 +834,7 @@ void OctomapServer::callbackLaserScan(const sensor_msgs::msg::LaserScan::SharedP
 
     if (!sh_control_manager_diag_.hasMsg()) {
 
-      RCLCPP_WARN_THROTTLE(node_->get_logger(),*this->get_clock(),1000, "missing control manager diagnostics, can not integrate data!");
+      RCLCPP_WARN_THROTTLE(node_->get_logger(),*clock_,1000, "missing control manager diagnostics, can not integrate data!");
       return;
 
     } else {
@@ -842,12 +842,12 @@ void OctomapServer::callbackLaserScan(const sensor_msgs::msg::LaserScan::SharedP
       rclcpp::Time last_time = sh_control_manager_diag_.lastMsgTime();  
 
       if ((clock_->now() - last_time).seconds() > 1.0) {
-        RCLCPP_WARN_THROTTLE(node_->get_logger(),*this->get_clock(),1000, "control manager diagnostics too old, can not integrate data!");
+        RCLCPP_WARN_THROTTLE(node_->get_logger(),*clock_,1000, "control manager diagnostics too old, can not integrate data!");
         return;
       }
 
       if (!sh_control_manager_diag_.getMsg()->flying_normally) {
-        RCLCPP_WARN_THROTTLE(node_->get_logger(),*this->get_clock(),1000, "not flying normally, therefore, not integrating data");
+        RCLCPP_WARN_THROTTLE(node_->get_logger(),*clock_,1000, "not flying normally, therefore, not integrating data");
         return;
       }
     }
@@ -865,7 +865,7 @@ void OctomapServer::callbackLaserScan(const sensor_msgs::msg::LaserScan::SharedP
   auto res = transformer_->getTransform(msg->header.frame_id, _world_frame_, msg->header.stamp);
 
   if (!res) {
-    RCLCPP_WARN_THROTTLE(node_->get_logger(),*this->get_clock(),1000, "[OctomapServer]: insertLaserScanCallback(): could not find tf from %s to %s", scan->header.frame_id.c_str(), _world_frame_.c_str());
+    RCLCPP_WARN_THROTTLE(node_->get_logger(),*clock_,1000, "[OctomapServer]: insertLaserScanCallback(): could not find tf from %s to %s", scan->header.frame_id.c_str(), _world_frame_.c_str());
     return;
   }
 
@@ -923,26 +923,28 @@ void OctomapServer::callbackLaserScan(const sensor_msgs::msg::LaserScan::SharedP
 
 void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg, const SensorType_t sensor_type, const int sensor_id,
                                           const std::string topic, const bool pcl_over_max_range) {
-  RCLCPP_INFO_ONCE(this->get_logger(), "callback liderCloud1");
   if (!is_initialized_) {
     return;
   }
-  RCLCPP_INFO_ONCE(this->get_logger(), "callback liderCloud 2");
+
   if (!octrees_initialized_) {
     return;
   }
-  RCLCPP_INFO_ONCE(this->get_logger(), "callback liderCloud 3");
+
+  RCLCPP_INFO_ONCE(this->get_logger(), "callback liderCloud start");
 
   if (sensor_type == DEPTH_CAMERA && !vec_camera_info_processed_.at(sensor_id)) {
-    RCLCPP_WARN_THROTTLE(node_->get_logger(),*this->get_clock(),1000, "Received data for depth camera %d but no camera info received yet.", sensor_id);
+    RCLCPP_WARN_THROTTLE(this->get_logger(),*clock_,1000, "Received data for depth camera %d but no camera info received yet.", sensor_id);
     return;
   }
+
+  RCLCPP_INFO_ONCE(this->get_logger(), "callback liderCloud start2");
 
   if (!_map_while_grounded_) {
 
     if (!sh_control_manager_diag_.hasMsg()) {
 
-      RCLCPP_WARN_THROTTLE(node_->get_logger(),*this->get_clock(),1000, "missing control manager diagnostics, can not integrate data!");
+      RCLCPP_WARN_THROTTLE(this->get_logger(),*clock_,1000, "missing control manager diagnostics, can not integrate data!");
       return;
 
     } else {
@@ -950,33 +952,56 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
       rclcpp::Time last_time = sh_control_manager_diag_.lastMsgTime();
 
       if ((clock_->now() - last_time).seconds() > 1.0) {
-        RCLCPP_WARN_THROTTLE(node_->get_logger(),*this->get_clock(),1000, "control manager diagnostics too old, can not integrate data!");
+        RCLCPP_WARN_THROTTLE(this->get_logger(),*clock_,1000, "control manager diagnostics too old, can not integrate data!");
         return;
       }
 
       if (!sh_control_manager_diag_.getMsg()->flying_normally) {
-        RCLCPP_INFO_THROTTLE(node_->get_logger(),*this->get_clock(), 1000, "not flying normally, therefore, not integrating data");
+        RCLCPP_INFO_THROTTLE(node_->get_logger(),*clock_, 1000, "not flying normally, therefore, not integrating data");
         return;
       }
     }
   }
 
+  RCLCPP_INFO_ONCE(this->get_logger(), "callback liderCloud start3");
+
   sensor_msgs::msg::PointCloud2::ConstSharedPtr cloud = msg;
 
   rclcpp::Time time_start = clock_->now();
+
+  RCLCPP_INFO_ONCE(this->get_logger(), "callback liderCloud after clock");
 
   PCLPointCloud::Ptr pc              = pcl::make_shared<PCLPointCloud>();
   PCLPointCloud::Ptr free_vectors_pc = pcl::make_shared<PCLPointCloud>();
   PCLPointCloud::Ptr hit_pc          = pcl::make_shared<PCLPointCloud>();
 
-  pcl::fromROSMsg(*cloud, *pc);
-
-  auto res = transformer_->getTransform(cloud->header.frame_id, _world_frame_, cloud->header.stamp);
-
-  if (!res) {
-    RCLCPP_WARN_THROTTLE(node_->get_logger(),*this->get_clock(),1000, "could not find tf from %s to %s", cloud->header.frame_id.c_str(), _world_frame_.c_str());
+  // Debug: before converting
+  RCLCPP_INFO_ONCE(node_->get_logger(), "about to call pcl::fromROSMsg, cloud->width=%u, cloud->height=%u, frame_id=%s", cloud->width, cloud->height, cloud->header.frame_id.c_str());
+  try {
+    pcl::fromROSMsg(*cloud, *pc);
+  } catch (const std::exception &e) {
+    RCLCPP_INFO_ONCE(node_->get_logger(), "pcl::fromROSMsg threw exception: %s", e.what());
     return;
   }
+  RCLCPP_INFO_ONCE(node_->get_logger(), "pcl::fromROSMsg returned, pc->size=%zu", pc->points.size());
+
+  // Debug: before TF lookup
+  RCLCPP_INFO_ONCE(node_->get_logger(), "calling transformer_->getTransform(from=%s, to=%s, stamp=%u.%u)", cloud->header.frame_id.c_str(), _world_frame_.c_str(),
+               cloud->header.stamp.sec, cloud->header.stamp.nanosec);
+
+  // Consider using zero timestamp (latest) to avoid waiting for exact-stamp TF:
+  // auto res = transformer_->getTransform(cloud->header.frame_id, _world_frame_, cloud->header.stamp);
+  auto res = transformer_->getTransform(cloud->header.frame_id, _world_frame_, cloud->header.stamp); //error is here
+  RCLCPP_INFO_ONCE(this->get_logger(), "callback liderCloud after res");
+
+  if (!res) {
+    RCLCPP_WARN_THROTTLE(node_->get_logger(),*clock_,1000, "could not find tf from %s to %s (stamp %u.%u). Consider checking /tf and using latest transform.",
+                         cloud->header.frame_id.c_str(), _world_frame_.c_str(), cloud->header.stamp.sec, cloud->header.stamp.nanosec);
+    RCLCPP_INFO_ONCE(this->get_logger(), "callback before return");
+    return;
+  }
+
+  RCLCPP_INFO_ONCE(this->get_logger(), "callback liderCloud start4");
 
   Eigen::Matrix4f sensorToWorld;
   geometry_msgs::msg::TransformStamped sensorToWorldTf = res.value();
@@ -996,9 +1021,11 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
 
     // generate sensor lookup table for free space raycasting based on pointcloud dimensions
     if (cloud->height == 1 || cloud->width == 1) {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(),*this->get_clock(),2000, "Incoming pointcloud from %s #%d on topic %s is organized as a list! Free space raycasting of unknown rays won't work properly!",
+      RCLCPP_WARN_THROTTLE(node_->get_logger(),*clock_,2000, "Incoming pointcloud from %s #%d on topic %s is organized as a list! Free space raycasting of unknown rays won't work properly!",
                         _sensor_names_[sensor_type].c_str(), sensor_id, topic.c_str());
     }
+
+    RCLCPP_INFO_ONCE(this->get_logger(), "callback liderCloud start5");
 
     switch (sensor_type) {
 
@@ -1047,6 +1074,8 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
     }
   }
 
+  RCLCPP_INFO_ONCE(this->get_logger(), "callback liderCloud start6");
+
   // get raycasting parameters
   double free_ray_distance      = 0;
   bool   unknown_clear_occupied = false;
@@ -1069,6 +1098,7 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
     }
   }
 
+  RCLCPP_INFO_ONCE(this->get_logger(), "callback liderCloud start7");
   // points that are over the max range from previous pcl filtering, update only free space
   if (pcl_over_max_range) {
 
@@ -1166,6 +1196,8 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
     }
   }
 
+  RCLCPP_INFO_ONCE(this->get_logger(), "callback liderCloud start8");
+
   free_vectors_pc->header = pc->header;
 
   // transform to the map frame
@@ -1190,8 +1222,10 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
     double coef               = 0.5;
     avg_time_cloud_insertion_ = coef * avg_time_cloud_insertion_ + (1.0 - coef) * exec_duration;
 
-    RCLCPP_INFO_THROTTLE(node_->get_logger(), *this->get_clock(), 1000, "avg cloud insertion time = %.3f sec", avg_time_cloud_insertion_);
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "avg cloud insertion time = %.3f sec", avg_time_cloud_insertion_);
   }
+
+  RCLCPP_INFO_ONCE(this->get_logger(), "callback liderCloud end");
 }  // namespace mrs_octomap_server
 
 //}
@@ -1562,7 +1596,7 @@ void OctomapServer::timerPersistency() {
 
   if (!sh_control_manager_diag_.hasMsg()) {
 
-    RCLCPP_WARN_THROTTLE(node_->get_logger(),*this->get_clock(),1000, "missing control manager diagnostics, won't save the map automatically!");
+    RCLCPP_WARN_THROTTLE(node_->get_logger(),*clock_,1000, "missing control manager diagnostics, won't save the map automatically!");
     return;
 
   } else {
@@ -1570,7 +1604,7 @@ void OctomapServer::timerPersistency() {
     rclcpp::Time last_time = sh_control_manager_diag_.lastMsgTime();
 
     if ((clock_->now() - last_time).seconds() > 1.0) {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(),*this->get_clock(),1000, "control manager diagnostics too old, won't save the map automatically!");
+      RCLCPP_WARN_THROTTLE(node_->get_logger(),*clock_,1000, "control manager diagnostics too old, won't save the map automatically!");
       return;
     }
   }
@@ -1579,7 +1613,7 @@ void OctomapServer::timerPersistency() {
 
   if (control_manager_diag->flying_normally) {
 
-    RCLCPP_INFO_THROTTLE(node_->get_logger(),*this->get_clock(),1000, "saving the map");
+    RCLCPP_INFO_THROTTLE(node_->get_logger(),*clock_,1000, "saving the map");
 
     bool success = saveToFile(_persistency_map_name_);
 
@@ -1607,7 +1641,7 @@ void OctomapServer::timerAltitudeAlignment() {
 
   if (!sh_control_manager_diag_.hasMsg()) {
 
-    RCLCPP_WARN_THROTTLE(node_->get_logger(),*this->get_clock(),1000, "missing control manager diagnostics, won't save the map automatically!");
+    RCLCPP_WARN_THROTTLE(node_->get_logger(),*clock_,1000, "missing control manager diagnostics, won't save the map automatically!");
     return;
 
   } else {
@@ -1615,7 +1649,7 @@ void OctomapServer::timerAltitudeAlignment() {
     rclcpp::Time last_time = sh_control_manager_diag_.lastMsgTime();
 
     if ((clock_->now() - last_time).seconds() > 1.0) {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(),*this->get_clock(),1000, "control manager diagnostics too old, won't save the map automatically!");
+      RCLCPP_WARN_THROTTLE(node_->get_logger(),*clock_,1000, "control manager diagnostics too old, won't save the map automatically!");
       return;
     }
   }
@@ -1685,7 +1719,7 @@ void OctomapServer::timerAltitudeAlignment() {
 
   } else {
 
-    RCLCPP_INFO_THROTTLE(node_->get_logger(), *this->get_clock(), 1000, "waiting for the tf from %s to %s", _world_frame_.c_str(), _robot_frame_.c_str());
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "waiting for the tf from %s to %s", _world_frame_.c_str(), _robot_frame_.c_str());
     return;
   }
 
@@ -1693,7 +1727,7 @@ void OctomapServer::timerAltitudeAlignment() {
 
   if (!ground_z) {
 
-    RCLCPP_WARN_THROTTLE(node_->get_logger(),*this->get_clock(),1000, "could not calculate the Z of the ground below");
+    RCLCPP_WARN_THROTTLE(node_->get_logger(),*clock_,1000, "could not calculate the Z of the ground below");
 
     {
       std::scoped_lock lock(mutex_octree_global_, mutex_octree_local_);
@@ -1916,10 +1950,10 @@ void OctomapServer::insertPointCloud(
           }
         }
       } else {
-        RCLCPP_WARN_THROTTLE(node_->get_logger(), *this->get_clock(), 1000, "Unable to transform the pose to be cleared from frame %s to frame %s.", pws.header.frame_id.c_str(), _world_frame_.c_str());
+        RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "Unable to transform the pose to be cleared from frame %s to frame %s.", pws.header.frame_id.c_str(), _world_frame_.c_str());
       }
     } else {
-      RCLCPP_WARN_THROTTLE(node_->get_logger(), *this->get_clock(), 1000, "Latest pose from clear_box is too old - diff from now: %.3f", (clock_->now() - pws.header.stamp).seconds());
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *clock_, 1000, "Latest pose from clear_box is too old - diff from now: %.3f", (clock_->now() - pws.header.stamp).seconds());
     }
   }
 
@@ -2361,7 +2395,7 @@ bool OctomapServer::translateMap(std::shared_ptr<OcTree_t>& octree, const double
 void OctomapServer::timeoutGeneric(const std::string& topic, const rclcpp::Time& last_msg, [[maybe_unused]] const int n_pubs) {
   RCLCPP_WARN_THROTTLE(
       node_->get_logger(),
-      *this->get_clock(),
+      *clock_,
       1000,
       "not receiving '%s' for %.3f s",
       topic.c_str(),
