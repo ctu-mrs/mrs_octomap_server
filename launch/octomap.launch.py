@@ -138,7 +138,7 @@ def generate_launch_description():
 
     ld.add_action(ComposableNodeContainer(
         namespace=uav_name,
-        #name= uav_name+'_octomap_server_container',
+        # name= uav_name_str +'_octomap_server_container',
         name='octomap_server_container',
         package='rclcpp_components',
         executable='component_container_mt',
@@ -162,12 +162,12 @@ def generate_launch_description():
                 remappings=[
                         # 3D Lidar
                         #("~/lidar_3d_0_in", '~/lidar/points'),
-                        ("~/lidar_3d_0_in", '~/lidar_3d_topic_0'),
-                        ("~/lidar_3d_1_in", '~/lidar_3d_topic_1'),
+                        ("~/lidar_3d_0_in", '/uav30/ouster/points'),
+                        ("~/lidar_3d_1_in", '~/lidar_3d_topic_1'),          #need modifications
                         ("~/lidar_3d_2_in", '~/lidar_3d_topic_2'),
-                        ("~/lidar_3d_0_over_max_range_in", '~/lidar_3d_topic_0_over_max_range'),
-                        ("~/lidar_3d_1_over_max_range_in", '~/lidar_3d_topic_1_over_max_range'),
-                        ("~/lidar_3d_2_over_max_range_in", '~/lidar_3d_topic_2_over_max_range'),
+                        ("~/lidar_3d_0_over_max_range_in", '/uav30/ouster/lidar_3d_topic_0_over_max_range'),
+                        ("~/lidar_3d_1_over_max_range_in", '/uav30/ouster/lidar_3d_topic_1_over_max_range'),
+                        ("~/lidar_3d_2_over_max_range_in", '/uav30/ouster/lidar_3d_topic_2_over_max_range'),
 
                         # 2D Lidar
                         ("~/lidar_2d_0_in", '~/lidar_2d_topic_0'),
