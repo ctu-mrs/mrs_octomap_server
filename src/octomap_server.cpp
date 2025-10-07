@@ -923,14 +923,15 @@ void OctomapServer::callbackLaserScan(const sensor_msgs::msg::LaserScan::SharedP
 
 void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg, const SensorType_t sensor_type, const int sensor_id,
                                           const std::string topic, const bool pcl_over_max_range) {
-
+  RCLCPP_INFO(this->get_logger(), "callback liderCloud1")
   if (!is_initialized_) {
     return;
   }
-
+  RCLCPP_INFO(this->get_logger(), "callback liderCloud 2")
   if (!octrees_initialized_) {
     return;
   }
+  RCLCPP_INFO(this->get_logger(), "callback liderCloud 3")
 
   if (sensor_type == DEPTH_CAMERA && !vec_camera_info_processed_.at(sensor_id)) {
     RCLCPP_WARN_THROTTLE(node_->get_logger(),*this->get_clock(),1000, "Received data for depth camera %d but no camera info received yet.", sensor_id);
