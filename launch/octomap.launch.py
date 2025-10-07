@@ -39,7 +39,7 @@ def generate_launch_description():
    
     ld.add_action(DeclareLaunchArgument(
         'UAV_NAME',
-        default_value=EnvironmentVariable('UAV_NAME', default_value='uav1'),
+        default_value=EnvironmentVariable('UAV_NAME', default_value='uav30'),
         description="Name of the UAV, used for namespacing"
     ))
     uav_name = LaunchConfiguration('UAV_NAME')
