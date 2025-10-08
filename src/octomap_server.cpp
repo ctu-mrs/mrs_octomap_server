@@ -626,7 +626,7 @@ void OctomapServer::onInit() {
 
   /* transformer //{ */
 
-  transformer_ = std::make_unique<mrs_lib::Transformer>(node_);
+  transformer_ = std::make_unique<mrs_lib::Transformer>('OctomapServer');
   transformer_->setDefaultPrefix(_uav_name_);
   transformer_->setLookupTimeout(std::chrono::duration<double>(0.5));
   transformer_->retryLookupNewest(false);
@@ -662,7 +662,9 @@ void OctomapServer::onInit() {
 
     std::stringstream ss;
 //ss << "~/lidar_3d_" << i << "_in";
-    ss << "/uav30/ouster/points";
+    ss << "/uav1/lidar/points";
+    
+    //ss << "/uav30/ouster/points";
 
     
     auto callback = [this, i, topic = ss.str()](const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) {
