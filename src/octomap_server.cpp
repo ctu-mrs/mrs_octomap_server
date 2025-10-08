@@ -630,7 +630,7 @@ void OctomapServer::onInit() {
   transformer_->setDefaultPrefix(_uav_name_);
   transformer_->setLookupTimeout(std::chrono::duration<double>(0.5));
   transformer_->retryLookupNewest(false);
-  RCLCPP_WARN(node_->get_logger(), "[OctomapServer]: Initialized transformer.");
+  RCLCPP_INFO(node_->get_logger(), "[OctomapServer]: Initialized transformer.");
 
   //}
 
