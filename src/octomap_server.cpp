@@ -991,6 +991,9 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
 
   // Consider using zero timestamp (latest) to avoid waiting for exact-stamp TF:
   // auto res = transformer_->getTransform(cloud->header.frame_id, _world_frame_, cloud->header.stamp);
+  
+  RCLCPP_INFO_ONCE(node_->get_logger(), "calling transformer_->getTransform(from=%s, to=%s, stamp=%u.%u)", msg->header.frame_id.c_str(), _world_frame_.c_str(),
+               msg->header.stamp.sec, msg->header.stamp.nanosec);
   auto res = transformer_->getTransform(msg->header.frame_id, _world_frame_, msg->header.stamp);
   //auto res = transformer_->getTransform(cloud->header.frame_id, _world_frame_, cloud->header.stamp); //error is here
   RCLCPP_INFO_ONCE(this->get_logger(), "callback liderCloud after res");
