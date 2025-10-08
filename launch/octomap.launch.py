@@ -5,7 +5,6 @@ from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
 )
-from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import (
     EnvironmentVariable,
     LaunchConfiguration,
@@ -13,10 +12,9 @@ from launch.substitutions import (
     PathJoinSubstitution,
     IfElseSubstitution,
 )
-from launch_ros.actions import Node, ComposableNodeContainer, LoadComposableNodes
+from launch_ros.actions import ComposableNodeContainer, LoadComposableNodes
 from launch_ros.descriptions import ComposableNode
 from launch.actions import LogInfo
-from launch_ros.actions import Node
 
 
 
@@ -122,8 +120,8 @@ def generate_launch_description():
     # ## Frame ID Arguments ##
     # ########################
     
-    world_frame = PythonExpression(['"', uav_name, '/world_origin"']) # Corrected based on your log output
-    robot_frame = PythonExpression(['"', uav_name, '/fcu"'])
+    world_frame = PythonExpression(['"/', uav_name, '/world_origin"']) # Corrected based on your log output
+    robot_frame = PythonExpression(['"/', uav_name, '/fcu"'])
 
     # ###################################
     # ## Composable Node and Container ##

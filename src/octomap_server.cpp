@@ -626,8 +626,8 @@ void OctomapServer::onInit() {
 
   /* transformer //{ */
 
-  transformer_ = std::make_unique<mrs_lib::Transformer>('OctomapServer');
-  transformer_->setDefaultPrefix(_uav_name_);
+  transformer_ = std::make_unique<mrs_lib::Transformer>(node_);
+  //transformer_->setDefaultPrefix(_uav_name_);
   transformer_->setLookupTimeout(std::chrono::duration<double>(0.5));
   transformer_->retryLookupNewest(false);
   RCLCPP_INFO(node_->get_logger(), "[OctomapServer]: Initialized transformer.");
