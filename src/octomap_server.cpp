@@ -1,4 +1,4 @@
-/* includes //{ */
+/* includes //{ */// ...existing code...
 #include <octomap/OcTreeNode.h>
 #include <octomap/octomap.h>
 #include <octomap/OcTreeKey.h>
@@ -6,29 +6,24 @@
 #include <geometry_msgs/msg/vector3.hpp>
 #include <geometry_msgs/msg/point.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
+#include <geometry_msgs/msg/transform_stamped.hpp>
 
-#include <laser_geometry/laser_geometry.hpp>  
+#include <laser_geometry/laser_geometry.hpp>
 
 #include <sensor_msgs/msg/point_cloud2.hpp>
-#include <sensor_msgs/point_cloud2_iterator.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <sensor_msgs/msg/camera_info.hpp>
 
 #include <std_srvs/srv/empty.hpp>
-#include <std_srvs/srv/trigger.hpp>
 
 #include <pcl/conversions.h>
-#include <pcl/io/pcd_io.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/common/transforms.h>
 #include <pcl/filters/voxel_grid.h>
-#include <pcl/filters/statistical_outlier_removal.h>
 #include <pcl/filters/crop_box.h>
 #include <pcl_ros/transforms.hpp>
 
-#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
-
-#include <octomap_msgs/srv/bounding_box_query.hpp>
+#include <octomap_msgs/msg/octomap.hpp>
 #include <octomap_msgs/conversions.h>
 
 #include <mrs_lib/param_loader.h>
@@ -40,8 +35,6 @@
 
 #include <mrs_modules_msgs/msg/pose_with_size.hpp>
 
-#include <mrs_octomap_server/conversions.h>
-
 #include <mrs_msgs/msg/control_manager_diagnostics.hpp>
 #include <mrs_msgs/msg/float64_stamped.hpp>
 #include <mrs_msgs/srv/string.hpp>
@@ -49,17 +42,10 @@
 #include <Eigen/Geometry>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
-#include <pcl/memory.h>
-
-#include <tf2/LinearMath/Quaternion.h>
-#include <tf2/LinearMath/Matrix3x3.h>
-#include <tf2_eigen/tf2_eigen.hpp>
-
 
 #include <filesystem>
-
-
 #include <cmath>
+
 
 //}
 
@@ -68,6 +54,13 @@
 
 namespace mrs_octomap_server
 {
+
+
+  // helper: convert a geometry_msgs Vector3 -> octomap::point3d
+  inline octomap::point3d vector3ToOctomap(const geometry_msgs::msg::Vector3 &v) {
+    return octomap::point3d(v.x, v.y, v.z);
+  }
+
   #if USE_ROS_TIMER == 1
     typedef mrs_lib::ROSTimer TimerType;
     #else
@@ -916,7 +909,9 @@ void OctomapServer::callbackLaserScan(const sensor_msgs::msg::LaserScan::SharedP
 
   insertPointCloud(sensorToWorldTf.transform.translation, pc, free_vectors_pc, _unknown_rays_distance_, _unknown_rays_clear_occupied_);
 
-  [[maybe_unused]] const octomap::point3d sensor_origin = octomap::pointTfToOctomap(sensorToWorldTf.transform.translation);
+  
+  [[maybe_unused]] const octomap::point3d sensor_origin = vector3ToOctomap(sensorToWorldTf.transform.translation);
+  //[[maybe_unused]] const octomap::point3d sensor_origin = octomap::pointTfToOctomap(sensorToWorldTf.transform.translation);
 }
 
 //}
@@ -1216,7 +1211,8 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
 
   insertPointCloud(sensorToWorldTf.transform.translation, hit_pc, free_vectors_pc, free_ray_distance, unknown_clear_occupied);
 
-  [[maybe_unused]] const octomap::point3d sensor_origin = octomap::pointTfToOctomap(sensorToWorldTf.transform.translation);
+  [[maybe_unused]] const octomap::point3d sensor_origin = vector3ToOctomap(sensorToWorldTf.transform.translation);
+  //[[maybe_unused]] const octomap::point3d sensor_origin = octomap::pointTfToOctomap(sensorToWorldTf.transform.translation);
 
   {
     std::scoped_lock lock(mutex_avg_time_cloud_insertion_);
@@ -1789,7 +1785,9 @@ void OctomapServer::insertPointCloud(
   rclcpp::Time time_start = clock_->now();
   std::scoped_lock lock(mutex_octree_local_);
   auto [local_map_width, local_map_height] = mrs_lib::get_mutexed(mutex_local_map_dimensions_, local_map_width_, local_map_height_);
-  const octomap::point3d sensor_origin = octomap::pointTfToOctomap(sensorOriginTf);
+  //const octomap::point3d sensor_origin = octomap::pointTfToOctomap(sensorOriginTf);
+  const octomap::point3d sensor_origin = vector3ToOctomap(sensorOriginTf);
+
 
   //Here decimate the pointCloud
 

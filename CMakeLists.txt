@@ -28,24 +28,20 @@ set(DEPENDENCIES
   rclcpp
   rclcpp_components
   Eigen3
-  OpenMP
   sensor_msgs
   std_srvs
   std_msgs
   geometry_msgs
-  tf2_geometry_msgs
   laser_geometry
   mrs_lib
   mrs_msgs
   octomap
   octomap_msgs
-  octomap_ros
   PCL
   pcl_conversions
-  pcl_msgs
   pcl_ros
   mrs_modules_msgs
-  )
+)
 
 set(LIBRARIES
   MrsOctomapServer
