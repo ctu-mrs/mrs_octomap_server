@@ -34,7 +34,7 @@ def generate_launch_description():
     this_pkg_path = get_package_share_directory(pkg_name)
 
     # Arguments
-   
+
     ld.add_action(DeclareLaunchArgument(
         'UAV_NAME',
         default_value=EnvironmentVariable('UAV_NAME', default_value='uav30'),
@@ -52,7 +52,7 @@ def generate_launch_description():
     )
     run_type = LaunchConfiguration('RUN_TYPE')
 
-    
+
     ld.add_action(
         DeclareLaunchArgument(
             'debug',
@@ -82,13 +82,13 @@ def generate_launch_description():
     custom_config = LaunchConfiguration('custom_config')
 
 
-    
+
     processed_custom_config = IfElseSubstitution(
             condition=PythonExpression(['"', custom_config, '" != "" and ', 'not "', custom_config, '".startswith("/")']),
             if_value=PathJoinSubstitution([EnvironmentVariable('PWD'), custom_config]),
             else_value=custom_config
             )
-    
+
     run_type=os.getenv('RUN_TYPE', 'realworld')
 
     if run_type == "simulation":
@@ -104,7 +104,7 @@ def generate_launch_description():
         description="Whether to use simulation time."
     ))
     use_sim_time = LaunchConfiguration('use_sim_time')\
-    
+
     # ld.add_action(DeclareLaunchArgument(
     #     'custom_config',
     #     default_value="",
@@ -119,15 +119,15 @@ def generate_launch_description():
     # ########################
     # ## Frame ID Arguments ##
     # ########################
-    
-    world_frame = PythonExpression(['"/', uav_name, '/world_origin"']) # Corrected based on your log output
-    robot_frame = PythonExpression(['"/', uav_name, '/fcu"'])
+
+    world_frame = PythonExpression(['"', uav_name, '/world_origin"']) # Corrected based on your log output
+    robot_frame = PythonExpression(['"', uav_name, '/fcu"'])
 
     # ###################################
     # ## Composable Node and Container ##
     # ###################################
     config_files = [
-        os.path.join(this_pkg_path, 'config', 'default.yaml'),   
+        os.path.join(this_pkg_path, 'config', 'default.yaml'),
     ]
 
     ld.add_action(LogInfo(msg=["Config file exists: ", str(os.path.exists(config_files[0]))]))
