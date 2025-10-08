@@ -656,15 +656,15 @@ void OctomapServer::onInit() {
     std::stringstream ss;
 //ss << "~/lidar_3d_" << i << "_in";
     ss << "/uav1/lidar/points";
-    
+
     //ss << "/uav30/ouster/points";
 
-    
+
     auto callback = [this, i, topic = ss.str()](const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) {
       this->callback3dLidarCloud2(msg, LIDAR_3D, i, topic, false);
     };
     sh_3dlaser_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(shopts, ss.str(), callback));
-    
+
 
     std::stringstream ss2;
     ss2 << "~/lidar_3d_" << i << "_over_max_range_in";
@@ -708,7 +708,7 @@ void OctomapServer::onInit() {
     };
     sh_depth_cam_info_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::CameraInfo>(shopts, ss.str(), callback));
     
-  
+
       }
 
   //}
@@ -909,7 +909,7 @@ void OctomapServer::callbackLaserScan(const sensor_msgs::msg::LaserScan::SharedP
 
   insertPointCloud(sensorToWorldTf.transform.translation, pc, free_vectors_pc, _unknown_rays_distance_, _unknown_rays_clear_occupied_);
 
-  
+
   [[maybe_unused]] const octomap::point3d sensor_origin = vector3ToOctomap(sensorToWorldTf.transform.translation);
   //[[maybe_unused]] const octomap::point3d sensor_origin = octomap::pointTfToOctomap(sensorToWorldTf.transform.translation);
 }
