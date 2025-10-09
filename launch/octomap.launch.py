@@ -124,23 +124,16 @@ def generate_launch_description():
                     'ros.logging.severity_threshold': 'INFO',  # Keep INFO level
                 }],
                 remappings=[
-                        # 3D Lidar
-                        #("~/lidar_3d_0_in", '~/lidar/points'),
-                        #("~/lidar_3d_0_in", '/uav30/ouster/points'),
-                        #("~/lidar_3d_0_over_max_range_in", '~/lidar_3d_topic_0_over_max_range'),
-                        ("lidar_3d_0_in", LaunchConfiguration('lidar_3d_topic_0_in')),
-                        ("lidar_3d_0_over_max_range_in", LaunchConfiguration('lidar_3d_topic_0_over_max_range_in')),
-                        
                         # Other remappings
                         ("~/control_manager_diagnostics_in", "control_manager/diagnostics"),
                         ("~/height_in", "odometry/height"),
                         ("~/clear_box_in", "uav_pose_estimator/clear_box"),
 
                         # Topics out
-                        ("~/octomap_global_full_out", "~/octomap_global_full"),
-                        ("~/octomap_global_binary_out", "~/octomap_global_binary"),
-                        ("~/octomap_local_full_out", "~/octomap_local_full"),
-                        ("~/octomap_local_binary_out", "~/octomap_local_binary"),
+                        ("octomap_global_full_out", "octomap_global_full"),
+                        ("octomap_global_binary_out", "octomap_global_binary"),
+                        ("octomap_local_full_out", "octomap_local_full"),
+                        ("octomap_local_binary_out", "octomap_local_binary"),
 
                         # Services
                         ("~/reset_map_in", "~/reset_map"),

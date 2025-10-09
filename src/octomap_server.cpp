@@ -144,6 +144,11 @@ namespace mrs_octomap_server
     rclcpp::Node::SharedPtr node_;
     rclcpp::Clock::SharedPtr clock_;
 
+    // | -------------------- callbacks group ------------------- |
+    rclcpp::CallbackGroup::SharedPtr cbgrp_main_;
+    rclcpp::CallbackGroup::SharedPtr cbgrp_sensors_;
+    rclcpp::CallbackGroup::SharedPtr cbgrp_status_;
+
     // | -------------------- callbacks ------------------- |
 
 
@@ -155,7 +160,6 @@ namespace mrs_octomap_server
     void callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg, const SensorType_t sensor_type, const int sensor_id, const std::string topic,
                                 const bool pcl_over_max_range);
 
-    void callbackLaserScan(const sensor_msgs::msg::LaserScan::SharedPtr msg);
     void callbackCameraInfo(const sensor_msgs::msg::CameraInfo::ConstSharedPtr msg, const int sensor_id);
     bool loadFromFile(const std::string& filename);
     bool saveToFile(const std::string& filename);
@@ -343,18 +347,15 @@ void OctomapServer::onInit() {
   node_ = this->shared_from_this();
   clock_ = node_->get_clock();
 
+  /* Initialize callback groups*/
+  cbgrp_main_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbgrp_sensors_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cbgrp_status_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
-
-  /* Initialize callback groups
-    Looks non usefull */
-  //cbgrp_main_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  //cbgrp_sensors_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  //cbgrp_status_ = this->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-
-  /* params //{ */
-
+  // | ----------------------- load files ----------------------- |
   mrs_lib::ParamLoader param_loader(this->shared_from_this(), this->get_name());
 
+  // load custom config
   std::string custom_config_path;
   param_loader.loadParam("custom_config", custom_config_path);
 
@@ -373,8 +374,6 @@ void OctomapServer::onInit() {
     param_loader.addYamlFile(config_file);
   }
 
-
-
   param_loader.loadParam("simulation", _simulation_);
   param_loader.loadParam("uav_name", _uav_name_);
 
@@ -390,9 +389,9 @@ void OctomapServer::onInit() {
   param_loader.loadParam("persistency/align_altitude/robot_height", _robot_height_);
 
   param_loader.loadParam("global_map/size", _global_map_size_);
+  param_loader.loadParam("global_map/enabled", _global_map_enabled_);
   param_loader.loadParam("global_map/publisher_rate", _global_map_publisher_rate_);
   param_loader.loadParam("global_map/creation_rate", _global_map_creator_rate_);
-  param_loader.loadParam("global_map/enabled", _global_map_enabled_);
   param_loader.loadParam("global_map/compress", _global_map_compress_);
   param_loader.loadParam("global_map/publish_full", _global_map_publish_full_);
   param_loader.loadParam("global_map/publish_binary", _global_map_publish_binary_);
@@ -599,10 +598,10 @@ void OctomapServer::onInit() {
     bool success = loadFromFile(_persistency_map_name_);
 
     if (success) {
-      RCLCPP_INFO(node_->get_logger(),"loaded persistency map");
+      RCLCPP_INFO(node_->get_logger(),"[OctomapServer]: loaded persistency map");
     } else {
 
-      RCLCPP_ERROR(node_->get_logger(),"failed to load the persistency map, turning persistency off");
+      RCLCPP_ERROR(node_->get_logger(),"[OctomapServer]: failed to load the persistency map, turning persistency off");
 
       _persistency_enabled_ = false;
     }
@@ -630,97 +629,108 @@ void OctomapServer::onInit() {
   mrs_lib::PublisherHandlerOptions phopts;
   phopts.node = node_;
 
-  pub_map_global_full_    = mrs_lib::PublisherHandler<octomap_msgs::msg::Octomap>(phopts, "~/octomap_global_full_out");
-  pub_map_global_binary_  = mrs_lib::PublisherHandler<octomap_msgs::msg::Octomap>(phopts, "~/octomap_global_binary_out");
-  pub_map_local_full_     = mrs_lib::PublisherHandler<octomap_msgs::msg::Octomap>(phopts, "~/octomap_local_full_out");
-  pub_map_local_binary_   = mrs_lib::PublisherHandler<octomap_msgs::msg::Octomap>(phopts, "~/octomap_local_binary_out");
+  pub_map_global_full_    = mrs_lib::PublisherHandler<octomap_msgs::msg::Octomap>(phopts, "octomap_global_full_out");
+  pub_map_global_binary_  = mrs_lib::PublisherHandler<octomap_msgs::msg::Octomap>(phopts, "octomap_global_binary_out");
+  pub_map_local_full_     = mrs_lib::PublisherHandler<octomap_msgs::msg::Octomap>(phopts, "octomap_local_full_out");
+  pub_map_local_binary_   = mrs_lib::PublisherHandler<octomap_msgs::msg::Octomap>(phopts, "octomap_local_binary_out");
 
   //}
 
   /* subscribers //{ */
 
-  mrs_lib::SubscriberHandlerOptions shopts;
-  shopts.node = node_;
+  mrs_lib::SubscriberHandlerOptions shopts(node_);
   shopts.no_message_timeout = mrs_lib::no_timeout;
   shopts.threadsafe         = true;
   shopts.autostart          = true;
 
-  sh_control_manager_diag_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::ControlManagerDiagnostics>(shopts, "~/control_manager_diagnostics_in");
-  sh_height_               = mrs_lib::SubscriberHandler<mrs_msgs::msg::Float64Stamped>(shopts, "~/height_in");
-  sh_clear_box_            = mrs_lib::SubscriberHandler<mrs_modules_msgs::msg::PoseWithSize>(shopts, "~/clear_box_in");
+  rclcpp::SubscriptionOptions subscription_options = rclcpp::SubscriptionOptions();
+  subscription_options.callback_group = cbgrp_sensors_;
+  shopts.subscription_options = subscription_options;
 
+  sh_control_manager_diag_ = mrs_lib::SubscriberHandler<mrs_msgs::msg::ControlManagerDiagnostics>(shopts, "control_manager_diagnostics_in");
+  sh_height_               = mrs_lib::SubscriberHandler<mrs_msgs::msg::Float64Stamped>(shopts, "height_in");
+  sh_clear_box_            = mrs_lib::SubscriberHandler<mrs_modules_msgs::msg::PoseWithSize>(shopts, "clear_box_in");
 
+  // Load topic remapping parameters
+  std::string lidar_3d_topic_0;
+  param_loader.loadParam("lidar_3d_topic_0_in", lidar_3d_topic_0);
+  RCLCPP_WARN(this->get_logger(), "[Octomap_erver]: Loaded topic parameter: %s", lidar_3d_topic_0.c_str());
+
+  // Loop for 3D LiDar sensors
   for (int i = 0; i < n_sensors_3d_lidar_; i++) {
-    std::stringstream ss;
-//ss << "~/lidar_3d_" << i << "_in";
-    //ss << "/uav1/lidar/points";
 
-    ss << "/uav30/ouster/points";
+    std::string topic_name;
+    if (i == 0 && !lidar_3d_topic_0.empty()) {
+      topic_name = lidar_3d_topic_0;
+      RCLCPP_WARN(this->get_logger(), "[Octomap_Server]: Using parameter topic for sensor %d: %s", i, topic_name.c_str());
+    } else {
+      std::stringstream ss;
+      ss << "lidar_3d_" << i << "_in";
+      topic_name = ss.str();
+      RCLCPP_WARN(this->get_logger(), "[Octomap_Server]: Using default topic for sensor %d: %s", i, topic_name.c_str());
+    }
 
-
-    auto callback = [this, i, topic = ss.str()](const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) {
+    auto callback = [this, i, topic = topic_name](const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) {
       this->callback3dLidarCloud2(msg, LIDAR_3D, i, topic, false);
     };
-    sh_3dlaser_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(shopts, ss.str(), callback));
+    sh_3dlaser_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(shopts, topic_name, callback));
 
 
     std::stringstream ss2;
-    ss2 << "~/lidar_3d_" << i << "_over_max_range_in";
-    auto callback_ss2 = [this, i, topic = ss2.str()](const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) {
+    ss2 << "lidar_3d_" << i << "_over_max_range_in";
+    const std::string topic_name_over_max = ss2.str();
+    auto callback_over_max = [this, i, topic = topic_name](const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) {
       this->callback3dLidarCloud2(msg, LIDAR_3D, i, topic, true);
     };
-    sh_3dlaser_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(shopts, ss.str(), callback_ss2));
+    sh_3dlaser_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(shopts, topic_name_over_max, callback_over_max));
   }
-
-
-
 
   for (int i = 0; i < n_sensors_depth_cam_; i++) {
     std::stringstream ss;
-    ss << "~/depth_camera_" << i << "_in";
-    auto callback = [this, i, topic = ss.str()](const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) {
+    ss << "depth_camera_" << i << "_in";
+    const std::string topic_name = ss.str();
+    auto callback = [this, i, topic = topic_name](const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) {
       this->callback3dLidarCloud2(msg, DEPTH_CAMERA, i, topic, false);
     };
-    sh_depth_cam_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(shopts, ss.str(), callback));
+    sh_depth_cam_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(shopts, topic_name, callback));
 
 
     std::stringstream ss2;
-    ss2 << "~/depth_camera_" << i << "_over_max_range_in";
-    auto callback_ss2 = [this, i, topic = ss2.str()](const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) {
+    ss2 << "depth_camera_" << i << "_over_max_range_in";
+    const std::string topic_name_over_max = ss2.str();
+
+    auto callback_over_max = [this, i, topic = ss2.str()](const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) {
       this->callback3dLidarCloud2(msg, DEPTH_CAMERA, i, topic, true);
     };
-    sh_depth_cam_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(shopts, ss.str(), callback_ss2));
-
+    sh_depth_cam_pc2_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::PointCloud2>(shopts, topic_name_over_max, callback_over_max));
   }
 
   for (int i = 0; i < n_sensors_depth_cam_; i++) {
 
     std::stringstream ss;
-    ss << "~/camera_info_" << i << "_in";
-
+    ss << "camera_info_" << i << "_in";
+    const std::string topic_name = ss.str();
 
     auto callback = [this, i](const sensor_msgs::msg::CameraInfo::ConstSharedPtr msg) {
       this->callbackCameraInfo(msg, i);
     };
-    sh_depth_cam_info_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::CameraInfo>(shopts, ss.str(), callback));
-
-
-      }
+    sh_depth_cam_info_.push_back(mrs_lib::SubscriberHandler<sensor_msgs::msg::CameraInfo>(shopts, topic_name, callback));
+    }
 
   //}
 
   /* service servers //{ */
 
   ss_reset_map_ = this->create_service<std_srvs::srv::Empty>(
-            "~/reset_map_in",
+            "reset_map_in",
             std::bind(&OctomapServer::callbackResetMap, this,
                       std::placeholders::_1, std::placeholders::_2));
   ss_save_map_ = this->create_service<mrs_msgs::srv::String>(
-            "~/save_map_in",
+            "save_map_in",
             std::bind(&OctomapServer::callbackSaveMap, this,
                       std::placeholders::_1, std::placeholders::_2));
   ss_load_map_ = this->create_service<mrs_msgs::srv::String>(
-            "~/load_map_in",
+            "load_map_in",
             std::bind(&OctomapServer::callbackLoadMap, this,
                       std::placeholders::_1, std::placeholders::_2));
 
@@ -730,27 +740,27 @@ void OctomapServer::onInit() {
   mrs_lib::TimerHandlerOptions timer_opts_start;
 
   timer_opts_start.node      = node_;
-  //timer_opts_start.callback_group = cbgrp_sensors_;
+  timer_opts_start.callback_group = cbgrp_sensors_;
   timer_opts_start.autostart = true;
 
   if (_global_map_enabled_) {
-    {
-    std::function<void()> callback_fcn = std::bind(&OctomapServer::timerGlobalMapPublisher, this);
-    timer_global_map_publisher_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(_global_map_publisher_rate_),callback_fcn);
-    }
-    {
-      std::function<void()> callback_fcn = std::bind(&OctomapServer::timerGlobalMapCreator, this);
-    timer_global_map_creator_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(_global_map_creator_rate_),callback_fcn);
-    }
+    std::function<void()> callback_global_map_publisher = std::bind(&OctomapServer::timerGlobalMapPublisher, this);
+    timer_global_map_publisher_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(_global_map_publisher_rate_, clock_),callback_global_map_publisher);
+    timer_global_map_publisher_->start();
+    
+    std::function<void()> callback_global_map_creator = std::bind(&OctomapServer::timerGlobalMapCreator, this);
+    timer_global_map_creator_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(_global_map_creator_rate_,clock_),callback_global_map_creator);
+    timer_global_map_creator_->start();
   }
-  {
-    std::function<void()> callback_fcn = std::bind(&OctomapServer::timerLocalMapPublisher, this);
-  timer_local_map_publisher_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(_local_map_publisher_rate_),callback_fcn);
-  }
-  {
-    std::function<void()> callback_fcn = std::bind(&OctomapServer::timerLocalMapResizer, this);
-    timer_local_map_resizer_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(1.0),callback_fcn);
-  }
+  
+  std::function<void()> callback_local_map = std::bind(&OctomapServer::timerLocalMapPublisher, this);
+  timer_local_map_publisher_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(_local_map_publisher_rate_,clock_),callback_local_map);
+  timer_local_map_publisher_->start();
+  
+  std::function<void()> callback_local_map_resizer = std::bind(&OctomapServer::timerLocalMapResizer, this);
+  timer_local_map_resizer_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(1.0),callback_local_map_resizer);
+  timer_local_map_resizer_->start();
+  
   if (_persistency_enabled_) {
     std::function<void()> callback_fcn = std::bind(&OctomapServer::timerPersistency, this);
     timer_persistency_ = std::make_shared<TimerType>(timer_opts_start, rclcpp::Rate(_persistency_save_time_),callback_fcn);
@@ -770,8 +780,7 @@ void OctomapServer::onInit() {
   //}
 
   is_initialized_ = true;
-
-  RCLCPP_INFO(node_->get_logger(),": Initialized");
+  RCLCPP_INFO(node_->get_logger(),"[Octomap_server]: Initialized");
 }
 
 //}
@@ -785,13 +794,11 @@ void OctomapServer::callbackCameraInfo(const sensor_msgs::msg::CameraInfo::Const
   if (!is_initialized_) {
     return;
   }
-
   if (vec_camera_info_processed_.at(sensor_id)) {
     return;
   }
 
   std::scoped_lock lock(mutex_lut_);
-
   sensor_params_depth_cam_[sensor_id].horizontal_fov = 2 * atan(msg->width / (2 * msg->k[0]));
   sensor_params_depth_cam_[sensor_id].vertical_fov   = 2 * atan(msg->height / (2 * msg->k[4]));
 
@@ -803,123 +810,17 @@ void OctomapServer::callbackCameraInfo(const sensor_msgs::msg::CameraInfo::Const
       sensor_params_depth_cam_[sensor_id].horizontal_fov * (180 / M_PI), sensor_params_depth_cam_[sensor_id].vertical_fov * (180 / M_PI));
 
   initializeDepthCamLUT(sensor_depth_camera_xyz_lut_[sensor_id], sensor_params_depth_cam_[sensor_id]);
-
   vec_camera_info_processed_.at(sensor_id) = true;
 }
 
 //}
 
-/* callbackLaserScan() //{ */
-
-void OctomapServer::callbackLaserScan(const sensor_msgs::msg::LaserScan::SharedPtr msg) {
-
-  if (!is_initialized_) {
-    return;
-  }
-
-  if (!octrees_initialized_) {
-    return;
-  }
-
-  if (!_map_while_grounded_) {
-
-    if (!sh_control_manager_diag_.hasMsg()) {
-
-      RCLCPP_WARN_THROTTLE(node_->get_logger(),*clock_,1000, "missing control manager diagnostics, can not integrate data!");
-      return;
-
-    } else {
-
-      rclcpp::Time last_time = sh_control_manager_diag_.lastMsgTime();
-
-      if ((clock_->now() - last_time).seconds() > 1.0) {
-        RCLCPP_WARN_THROTTLE(node_->get_logger(),*clock_,1000, "control manager diagnostics too old, can not integrate data!");
-        return;
-      }
-
-      if (!sh_control_manager_diag_.getMsg()->flying_normally) {
-        RCLCPP_WARN_THROTTLE(node_->get_logger(),*clock_,1000, "not flying normally, therefore, not integrating data");
-        return;
-      }
-    }
-  }
-
-  sensor_msgs::msg::LaserScan::ConstSharedPtr scan = msg;
-
-  PCLPointCloud::Ptr pc              = pcl::make_shared<PCLPointCloud>();
-  PCLPointCloud::Ptr free_vectors_pc = pcl::make_shared<PCLPointCloud>();
-
-  Eigen::Matrix4f                 sensorToWorld;
-  geometry_msgs::msg::TransformStamped sensorToWorldTf;
-
-
-  auto res = transformer_->getTransform(msg->header.frame_id, _world_frame_, msg->header.stamp);
-
-  if (!res) {
-    RCLCPP_WARN_THROTTLE(node_->get_logger(),*clock_,1000, "[OctomapServer]: insertLaserScanCallback(): could not find tf from %s to %s", scan->header.frame_id.c_str(), _world_frame_.c_str());
-    return;
-  }
-
-
-  pcl_ros::transformAsMatrix(res.value(), sensorToWorld);
-  // Convert the transform to an Eigen matrix using tf2
-  //sensorToWorldTf = res.value();
-  //Eigen::Isometry3d eigen_transform = tf2::transformToEigen(sensorToWorldTf.transform);
-  //sensorToWorld = eigen_transform.matrix().cast<float>();
-
-  // laser scan to point cloud
-  sensor_msgs::msg::PointCloud2 ros_cloud;
-  projector_.projectLaser(*scan, ros_cloud);
-  pcl::fromROSMsg(ros_cloud, *pc);
-
-  // compute free rays, if required
-  if (_unknown_rays_update_free_space_) {
-
-    sensor_msgs::msg::LaserScan free_scan = *scan;
-
-    [[maybe_unused]] double free_scan_distance = (scan->range_max - 1.0) < _unknown_rays_distance_ ? (scan->range_max - 1.0) : _unknown_rays_distance_;
-
-    for (size_t i = 0; i < scan->ranges.size(); i++) {
-      if (scan->ranges[i] > scan->range_max || scan->ranges[i] < scan->range_min) {
-        free_scan.ranges[i] = scan->range_max - 1.0;  // valid under max range
-      } else {
-        free_scan.ranges[i] = scan->range_min - 1.0;  // definitely invalid
-      }
-    }
-
-    sensor_msgs::msg::PointCloud2 free_cloud;
-    projector_.projectLaser(free_scan, free_cloud);
-
-    pcl::fromROSMsg(free_cloud, *free_vectors_pc);
-  }
-
-  free_vectors_pc->header = pc->header;
-
-  // transform to the map frame
-
-  pcl::transformPointCloud(*pc, *pc, sensorToWorld);
-  pcl::transformPointCloud(*free_vectors_pc, *free_vectors_pc, sensorToWorld);
-
-  pc->header.frame_id              = _world_frame_;
-  free_vectors_pc->header.frame_id = _world_frame_;
-
-  insertPointCloud(sensorToWorldTf.transform.translation, pc, free_vectors_pc, _unknown_rays_distance_, _unknown_rays_clear_occupied_);
-
-
-  [[maybe_unused]] const octomap::point3d sensor_origin = vector3ToOctomap(sensorToWorldTf.transform.translation);
-  //[[maybe_unused]] const octomap::point3d sensor_origin = octomap::pointTfToOctomap(sensorToWorldTf.transform.translation);
-}
-
-//}
-
 /* callback3dLidarCloud2() //{ */
-
 void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg, const SensorType_t sensor_type, const int sensor_id,
                                           const std::string topic, const bool pcl_over_max_range) {
   if (!is_initialized_) {
     return;
   }
-
   if (!octrees_initialized_) {
     return;
   }
@@ -1001,14 +902,6 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
   Eigen::Matrix4f sensorToWorld;
   geometry_msgs::msg::TransformStamped sensorToWorldTf = res.value();
   pcl_ros::transformAsMatrix(sensorToWorldTf, sensorToWorld);
-
-
-
-  // Convert transform to Eigen matrix using tf2_eigen
-  //Eigen::Isometry3d eigen_transform = tf2::transformToEigen(sensorToWorldTf.transform);
-  //sensorToWorld = eigen_transform.matrix().cast<float>();
-
-
 
   double max_range = 0.0;     //a voir pour debug (init to avoid build error message)
 
