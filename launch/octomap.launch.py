@@ -87,27 +87,10 @@ def generate_launch_description():
     # ###################################
     # ## Composable Node and Container ##
     # ###################################
-
-    # Load YAML configuration parameters
-    config_file_path = os.path.join(this_pkg_path, 'config', 'default.yaml')
-    config_params = {}
-
-    def flatten_dict(d, parent_key='', sep='/'):
-        """Flatten nested dictionary for ROS2 parameters"""
-        items = []
-        for k, v in d.items():
-            new_key = parent_key + sep + k if parent_key else k
-            if isinstance(v, dict):
-                items.extend(flatten_dict(v, new_key, sep=sep).items())
-            else:
-                items.append((new_key, v))
-        return dict(items)
-
-    if os.path.exists(config_file_path):
-        with open(config_file_path, 'r') as f:
-            yaml_params = yaml.safe_load(f)
-            if yaml_params:
-                config_params = flatten_dict(yaml_params)
+    
+    config_files = [
+        os.path.join(this_pkg_path, 'config', 'default.yaml'),
+    ]
 
 
     ld.add_action(ComposableNodeContainer(
@@ -136,11 +119,9 @@ def generate_launch_description():
                     'lidar_3d_topic_0_over_max_range_in': LaunchConfiguration('lidar_3d_topic_0_over_max_range_in'),
                     # Legacy parameters expected by the node
                     'custom_config': '',
-                    'config_files': [config_file_path],
+                    'config_files': config_files,
                     # Logging configuration
                     'ros.logging.severity_threshold': 'INFO',  # Keep INFO level
-                    # Load all YAML parameters
-                    **config_params,
                 }],
                 remappings=[
                         # 3D Lidar
