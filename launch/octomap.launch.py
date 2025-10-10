@@ -2,19 +2,14 @@
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import (
-    DeclareLaunchArgument,
-)
-from launch.substitutions import (
-    EnvironmentVariable,
-    LaunchConfiguration,
-    PythonExpression,
-    PathJoinSubstitution,
-    IfElseSubstitution,
-)
-from launch_ros.actions import ComposableNodeContainer, LoadComposableNodes
+from launch.actions import DeclareLaunchArgument, LogInfo
+from launch.substitutions import EnvironmentVariable, LaunchConfiguration, PathJoinSubstitution
+from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
-from launch.actions import LogInfo
+from launch.substitutions import IfElseSubstitution
+from launch.substitutions import PythonExpression
+
+
 
 
 
@@ -74,14 +69,14 @@ def generate_launch_description():
     # ############################
 
     ld.add_action(DeclareLaunchArgument('lidar_3d_topic_0_in', default_value='~/lidar/points', description='Input topic for 3D Lidar 0 point cloud.'))
-    ld.add_action(DeclareLaunchArgument('lidar_3d_topic_0_over_max_range_in', default_value='~/lidar_3d_0_over_max_range_in', description='Input topic for 3D Lidar 0 points over max range.'))
+    ld.add_action(DeclareLaunchArgument('lidar_3d_topic_0_over_max_range_in', default_value='lidar_3d_0_over_max_range_in', description='Input topic for 3D Lidar 0 points over max range.'))
 
     # ########################
     # ## Frame ID Arguments ##
     # ########################
     
-    world_frame = PythonExpression(['"', uav_name, '/world_origin"']) # Corrected based on your log output
-    robot_frame = PythonExpression(['"', uav_name, '/fcu"'])
+    world_frame = PathJoinSubstitution([uav_name, 'world_origin'])
+    robot_frame = PathJoinSubstitution([uav_name, 'fcu'])
 
 
     # ###################################
@@ -124,6 +119,9 @@ def generate_launch_description():
                     'ros.logging.severity_threshold': 'INFO',  # Keep INFO level
                 }],
                 remappings=[
+
+                        ("lidar_3d_0_in", LaunchConfiguration('lidar_3d_topic_0_in')),
+                        ("lidar_3d_0_over_max_range_in", LaunchConfiguration('lidar_3d_topic_0_over_max_range_in')),
                         # Other remappings
                         ("~/control_manager_diagnostics_in", "control_manager/diagnostics"),
                         ("~/height_in", "odometry/height"),
