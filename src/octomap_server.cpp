@@ -530,7 +530,7 @@ void OctomapServer::onInit() {
 
 
   if (!param_loader.loadedSuccessfully()) {
-  RCLCPP_ERROR(this->get_logger(), "[%s]: Could not load all non-optional parameters. Shutting down.", node_->get_name());
+  RCLCPP_ERROR(this->get_logger(), "Could not load all non-optional parameters. Shutting down.");
   rclcpp::shutdown();
   }
 
@@ -600,10 +600,10 @@ void OctomapServer::onInit() {
     bool success = loadFromFile(_persistency_map_name_);
 
     if (success) {
-      RCLCPP_INFO(this->get_logger(),"[OctomapServer]: loaded persistency map");
+      RCLCPP_INFO(this->get_logger(),"loaded persistency map");
     } else {
 
-      RCLCPP_ERROR(this->get_logger(),"[OctomapServer]: failed to load the persistency map, turning persistency off");
+      RCLCPP_ERROR(this->get_logger(),"failed to load the persistency map, turning persistency off");
 
       _persistency_enabled_ = false;
     }
@@ -623,7 +623,7 @@ void OctomapServer::onInit() {
   //transformer_->setDefaultPrefix(_uav_name_);
   transformer_->setLookupTimeout(std::chrono::duration<double>(0.5));
   transformer_->retryLookupNewest(false);
-  RCLCPP_INFO(this->get_logger(), "[OctomapServer]: Initialized transformer.");
+  RCLCPP_INFO(this->get_logger(), "Initialized transformer.");
 
   //}
 
@@ -656,7 +656,7 @@ void OctomapServer::onInit() {
   // Load topic remapping parameters
   std::string lidar_3d_topic_0;
   param_loader.loadParam("lidar_3d_topic_0_in", lidar_3d_topic_0);
-  RCLCPP_WARN(this->get_logger(), "[Octomap_erver]: Loaded topic parameter: %s", lidar_3d_topic_0.c_str());
+  RCLCPP_WARN(this->get_logger(), "Loaded topic parameter: %s", lidar_3d_topic_0.c_str());
 
   // Loop for 3D LiDar sensors
   for (int i = 0; i < n_sensors_3d_lidar_; i++) {
@@ -664,12 +664,12 @@ void OctomapServer::onInit() {
     std::string topic_name;
     if (i == 0 && !lidar_3d_topic_0.empty()) {
       topic_name = lidar_3d_topic_0;
-      RCLCPP_WARN(this->get_logger(), "[Octomap_Server]: Using parameter topic for sensor %d: %s", i, topic_name.c_str());
+      RCLCPP_WARN(this->get_logger(), "Using parameter topic for sensor %d: %s", i, topic_name.c_str());
     } else {
       std::stringstream ss;
       ss << "lidar_3d_" << i << "_in";
       topic_name = ss.str();
-      RCLCPP_WARN(this->get_logger(), "[Octomap_Server]: Using default topic for sensor %d: %s", i, topic_name.c_str());
+      RCLCPP_WARN(this->get_logger(), "Using default topic for sensor %d: %s", i, topic_name.c_str());
     }
 
     auto callback = [this, i, topic = topic_name](const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) {
@@ -782,7 +782,7 @@ void OctomapServer::onInit() {
   //}
 
   is_initialized_ = true;
-  RCLCPP_INFO(this->get_logger(),"[Octomap_server]: Initialized");
+  RCLCPP_INFO(this->get_logger(),"Initialized");
 }
 
 //}
@@ -869,13 +869,9 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
     }
   }
 
-  RCLCPP_INFO_ONCE(this->get_logger(), "callback liderCloud start3");
-
   sensor_msgs::msg::PointCloud2::ConstSharedPtr cloud = msg;
 
   rclcpp::Time time_start = clock_->now();
-
-  RCLCPP_INFO_ONCE(this->get_logger(), "callback liderCloud after clock");
 
   PCLPointCloud::Ptr pc              = pcl::make_shared<PCLPointCloud>();
   PCLPointCloud::Ptr free_vectors_pc = pcl::make_shared<PCLPointCloud>();
@@ -900,7 +896,6 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
 
   auto res = transformer_->getTransform(msg->header.frame_id, _world_frame_, rclcpp::Time(msg->header.stamp));
   //auto res = transformer_->getTransform(cloud->header.frame_id, _world_frame_, cloud->header.stamp); //error is here
-  RCLCPP_INFO_ONCE(this->get_logger(), "callback liderCloud after res");
 
   if (!res) {
     RCLCPP_WARN_THROTTLE(this->get_logger(),*clock_,1000, "could not find tf from %s to %s (stamp %u.%u). Consider checking /tf and using latest transform.",
@@ -1206,7 +1201,7 @@ bool OctomapServer::callbackResetMap([[maybe_unused]] const std::shared_ptr<std_
 
   octrees_initialized_ = true;
 
-  RCLCPP_INFO(this->get_logger(),"[OctomapServer]: octomap cleared");
+  RCLCPP_INFO(this->get_logger(),"Octomap cleared");
 
   return true;
 }

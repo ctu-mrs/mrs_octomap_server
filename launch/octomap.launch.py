@@ -68,12 +68,20 @@ def generate_launch_description():
     # ## Sensor Topic Arguments ##
     # ############################
 
-    ld.add_action(DeclareLaunchArgument('lidar_3d_topic_0_in', default_value='~/lidar/points', description='Input topic for 3D Lidar 0 point cloud.'))
+    ld.add_action(DeclareLaunchArgument(
+    'lidar_3d_topic_0_in',
+    default_value=PathJoinSubstitution([uav_name, 'lidar/points']),
+    description='Input topic for 3D Lidar 0 point cloud.'
+    ))
+
+    #ld.add_action(DeclareLaunchArgument('lidar_3d_topic_0_in', default_value=uav_name+ '/lidar/points', description='Input topic for 3D Lidar 0 point cloud.'))
     ld.add_action(DeclareLaunchArgument('lidar_3d_topic_0_over_max_range_in', default_value='lidar_3d_0_over_max_range_in', description='Input topic for 3D Lidar 0 points over max range.'))
 
     # ########################
     # ## Frame ID Arguments ##
     # ########################
+
+    
     
     world_frame = PathJoinSubstitution([uav_name, 'world_origin'])
     robot_frame = PathJoinSubstitution([uav_name, 'fcu'])
