@@ -4,13 +4,10 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, LogInfo
 from launch.substitutions import EnvironmentVariable, LaunchConfiguration, PathJoinSubstitution
-from launch_ros.actions import ComposableNodeContainer
+from launch_ros.actions import ComposableNodeContainer, Node
 from launch_ros.descriptions import ComposableNode
 from launch.substitutions import IfElseSubstitution
 from launch.substitutions import PythonExpression
-
-
-
 
 
 def generate_launch_description():
@@ -80,12 +77,9 @@ def generate_launch_description():
     # ########################
     # ## Frame ID Arguments ##
     # ########################
-
     
-    
-    world_frame = PathJoinSubstitution([uav_name, 'world_origin'])
+    world_frame = PathJoinSubstitution([uav_name, 'os_lidar'])
     robot_frame = PathJoinSubstitution([uav_name, 'fcu'])
-
 
     # ###################################
     # ## Composable Node and Container ##
@@ -94,7 +88,6 @@ def generate_launch_description():
     config_files = [
         os.path.join(this_pkg_path, 'config', 'default.yaml'),
     ]
-
 
     ld.add_action(ComposableNodeContainer(
         namespace=uav_name,

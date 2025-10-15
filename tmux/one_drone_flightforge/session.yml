@@ -39,7 +39,7 @@ windows:
   - mapping:
       layout: tiled
       panes:
-        - ros2 launch mrs_octomap_server octomap.launch.py
+        - waitForCore; ros2 launch mrs_octomap_server octomap.launch.py
   - path:
       layout: tiled
       panes:

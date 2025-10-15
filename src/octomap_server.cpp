@@ -844,8 +844,6 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
       }
   }
 
-  RCLCPP_INFO_ONCE(this->get_logger(), "callback liderCloud start2");
-
   if (!_map_while_grounded_) {
 
     if (!sh_control_manager_diag_.hasMsg()) {
@@ -877,8 +875,6 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
   PCLPointCloud::Ptr free_vectors_pc = pcl::make_shared<PCLPointCloud>();
   PCLPointCloud::Ptr hit_pc          = pcl::make_shared<PCLPointCloud>();
 
-  // Debug: before converting
-  RCLCPP_INFO_ONCE(this->get_logger(), "about to call pcl::fromROSMsg, cloud->width=%u, cloud->height=%u, frame_id=%s", cloud->width, cloud->height, cloud->header.frame_id.c_str());
   try {
     pcl::fromROSMsg(*cloud, *pc);
   } catch (const std::exception &e) {
@@ -891,11 +887,7 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
   RCLCPP_INFO_ONCE(this->get_logger(), "calling transformer_->getTransform(from=%s, to=%s, stamp=%u.%u)", cloud->header.frame_id.c_str(), _world_frame_.c_str(),
                cloud->header.stamp.sec, cloud->header.stamp.nanosec);
 
-  // Consider using zero timestamp (latest) to avoid waiting for exact-stamp TF:
-  // auto res = transformer_->getTransform(cloud->header.frame_id, _world_frame_, cloud->header.stamp);
-
-  auto res = transformer_->getTransform(msg->header.frame_id, _world_frame_, rclcpp::Time(msg->header.stamp));
-  //auto res = transformer_->getTransform(cloud->header.frame_id, _world_frame_, cloud->header.stamp); //error is here
+  auto res = transformer_->getTransform(cloud->header.frame_id, _world_frame_, rclcpp::Time(msg->header.stamp));
 
   if (!res) {
     RCLCPP_WARN_THROTTLE(this->get_logger(),*clock_,1000, "could not find tf from %s to %s (stamp %u.%u). Consider checking /tf and using latest transform.",
@@ -904,23 +896,17 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
     return;
   }
 
-  RCLCPP_INFO_ONCE(this->get_logger(), "callback liderCloud start4");
-
   Eigen::Matrix4f sensorToWorld;
   geometry_msgs::msg::TransformStamped sensorToWorldTf = res.value();
   pcl_ros::transformAsMatrix(sensorToWorldTf, sensorToWorld);
-
   double max_range = 0.0;     //a voir pour debug (init to avoid build error message)
 
   if (!pcl_over_max_range) {
-
     // generate sensor lookup table for free space raycasting based on pointcloud dimensions
     if (cloud->height == 1 || cloud->width == 1) {
       RCLCPP_WARN_THROTTLE(this->get_logger(),*clock_,2000, "Incoming pointcloud from %s #%d on topic %s is organized as a list! Free space raycasting of unknown rays won't work properly!",
                         _sensor_names_[sensor_type].c_str(), sensor_id, topic.c_str());
     }
-
-    RCLCPP_INFO_ONCE(this->get_logger(), "callback liderCloud start5");
 
     switch (sensor_type) {
 
@@ -969,7 +955,6 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
     }
   }
 
-  RCLCPP_INFO_ONCE(this->get_logger(), "callback liderCloud start6");
 
   // get raycasting parameters
   double free_ray_distance      = 0;
@@ -993,7 +978,6 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
     }
   }
 
-  RCLCPP_INFO_ONCE(this->get_logger(), "callback liderCloud start7");
   // points that are over the max range from previous pcl filtering, update only free space
   if (pcl_over_max_range) {
 
@@ -1091,8 +1075,6 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
     }
   }
 
-  RCLCPP_INFO_ONCE(this->get_logger(), "callback liderCloud start8");
-
   free_vectors_pc->header = pc->header;
 
   // transform to the map frame
@@ -1120,8 +1102,6 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
 
     RCLCPP_INFO_THROTTLE(this->get_logger(), *clock_, 1000, "avg cloud insertion time = %.3f sec", avg_time_cloud_insertion_);
   }
-
-  RCLCPP_INFO_ONCE(this->get_logger(), "callback liderCloud end");
 }  // namespace mrs_octomap_server
 
 //}
