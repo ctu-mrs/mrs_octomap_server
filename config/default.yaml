@@ -1,6 +1,6 @@
 map_while_grounded: true
 
-resolution: 0.4
+resolution: 0.4 # [m]
 
 scope_timer:
   enabled: false
@@ -44,7 +44,7 @@ local_map:
 
 global_map:
 
-  size: 80 # [m]
+  size: 80.0 # [m]
 
   # should create a global map from the local map?
   enabled: true
@@ -80,9 +80,9 @@ sensor_params:
       free_ray_distance: 15.0 # [m] max distance for free space raycasting
 
       # fallback values used for free space raycasting for missing data, uses pointcloud dimensions from the incoming message by default
-      vertical_fov_angle: 1.57
-      vertical_rays: 128
-      horizontal_rays: 128
+      vertical_fov_angle: 1.57 # [rad]
+      vertical_rays: 128 # [-]
+      horizontal_rays: 128 # [-]
 
       # what to do when data in the organized pointcloud is missing (is nan)
       unknown_rays:
@@ -100,10 +100,10 @@ sensor_params:
       free_ray_distance: 15.0 # [m] max distance for free space raycasting
 
       # fallback values used for free space raycasting for missing data, uses pointcloud dimensions and camera_info by default
-      horizontal_fov_angle: 1.221
-      vertical_fov_angle: 0.61
-      horizontal_rays: 80
-      vertical_rays: 45
+      horizontal_fov_angle: 1.221 # [rad]
+      vertical_fov_angle: 0.61 # [rad]
+      horizontal_rays: 80 # [-]
+      vertical_rays: 45 # [-]
 
       # what to do when data in the organized pointcloud is missing (is nan)
       unknown_rays:

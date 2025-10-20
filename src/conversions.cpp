@@ -1,8 +1,6 @@
 #include <mrs_octomap_server/conversions.h>
 #include <sensor_msgs/point_cloud2_iterator.hpp>
 
-
-
 namespace octomap
 {
 
