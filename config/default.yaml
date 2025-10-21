@@ -1,29 +1,10 @@
 map_while_grounded: true
 
-resolution: 0.4 # [m]
+map_resolution: 0.4 # [m]
 
 scope_timer:
   enabled: false
   log_filename: "/tmp/scope_timer_trajectory_generation.txt"
-
-persistency:
-
-  enabled: false
-
-  map_name: "default"
-
-  # save global map every "n" seconds, will be save only when flying_normally == true
-  save_time: 10.0 # [s]
-
-  # automatically aligns altitude after start
-  align_altitude:
-
-    enabled: false
-
-    ground_detection_distance: 2.0 # [m]
-
-    # how high is the fcu fram above the ground when sitting on the ground
-    robot_height: 0.3 # [m]
 
 local_map:
 
@@ -39,8 +20,8 @@ local_map:
   # the publisher rate of the local map
   publisher_rate: 10.0 # [Hz]
 
-  publish_full: true # should publish map with full probabilities?
-  publish_binary: false # should publish map with binary occupancy?
+  publish_full: false # should publish map with full probabilities?
+  publish_binary: true # should publish map with binary occupancy?
 
 global_map:
 
@@ -58,8 +39,8 @@ global_map:
   # should we prune the map before publishing?
   compress: true
 
-  publish_full: true # should publish map with full probabilities?
-  publish_binary: false # should publish map with binary occupancy?
+  publish_full: false # should publish map with full probabilities?
+  publish_binary: true # should publish map with binary occupancy?
 
 # used only when subscribing 2D LaserScan, pointclouds have separate parameters for each sensor
 unknown_rays:
@@ -84,6 +65,10 @@ sensor_params:
       vertical_rays: 128 # [-]
       horizontal_rays: 128 # [-]
 
+      decimation:
+        enabled: true
+        voxel_size: 0.4 # [m]
+
       # what to do when data in the organized pointcloud is missing (is nan)
       unknown_rays:
         update_free_space: true # update free space when data at the specific point is missing?
@@ -104,6 +89,10 @@ sensor_params:
       vertical_fov_angle: 0.61 # [rad]
       horizontal_rays: 80 # [-]
       vertical_rays: 45 # [-]
+
+      decimation:
+        enabled: true
+        voxel_size: 0.4 # [m]
 
       # what to do when data in the organized pointcloud is missing (is nan)
       unknown_rays:

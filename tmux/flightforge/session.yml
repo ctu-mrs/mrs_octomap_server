@@ -5,8 +5,10 @@ socket_name: mrs
 attach: false
 tmux_options: -f /etc/ctu-mrs/tmux.conf
 # you can modify these
-startup_window: path
-pre_window: export UAV_NAME=uav1; export USE_SIM_TIME="true"; export RMW_IMPLEMENTATION=rmw_zenoh_cpp
+startup_window: status
+pre_window: export UAV_NAME=uav1;
+            export USE_SIM_TIME="true";
+            export RMW_IMPLEMENTATION=rmw_zenoh_cpp
 windows:
   - router:
       layout: tiled
@@ -20,14 +22,22 @@ windows:
       layout: tiled
       panes:
         - ros2 launch mrs_uav_flightforge_simulator hw_api.launch.py
+  - core:
+      layout: tiled
+      panes:
+        - ros2 launch mrs_uav_core core.launch.py
+          platform_config:=./config/platform_config.yaml
+          world_config:=./config/world_config.yaml
+          custom_config:=./config/custom_config.yaml
+          network_config:=./config/network_config.yaml
   - status:
       layout: tiled
       panes:
         - ros2 run mrs_uav_status status.sh
-  - core:
+  - mapping:
       layout: tiled
       panes:
-        - ros2 launch mrs_uav_core core.launch.py platform_config:=./config/platform_config.yaml world_config:=./config/world_config.yaml custom_config:=./config/custom_config.yaml network_config:=./config/network_config.yaml
+        - ros2 launch mrs_octomap_server octomap.launch.py custom_config:=./config/octomap_server.yaml lidar_3d_0:=lidar/points
   - takeoff:
       layout: tiled
       panes:
@@ -36,20 +46,10 @@ windows:
       layout: tiled
       panes:
         - waitForCore; ./takeoff.sh
-  - mapping:
-      layout: tiled
-      panes:
-        - waitForCore; ros2 launch mrs_octomap_server octomap.launch.py
-  - path:
-      layout: tiled
-      panes:
-        - 'history -s ./path.py'
-  # - mapping:
+  # - stereo:
   #     layout: tiled
   #     panes:
-  #       - ros2 launch mrs_uav_unreal_simulator mapplan.launch.py \
-  #         config_octomap_server:=./config/octomap_server.yaml \
-  #         config_octomap_planner:=./config/octomap_planner.yaml
+  #       - ros2 launch stereo_image_proc stereo_image_proc.launch.py namespace:=uav1/stereo
   - goto:
       layout: tiled
       panes:
@@ -58,10 +58,10 @@ windows:
       layout: tiled
       panes:
         - ros2 run rviz2 rviz2 -d ./rviz.rviz --ros-args -p use_sim_time:=true
-  # - reconfigure:
-  #     layaut: tiled
-  #     panes:
-  #       - ros2 run rqt_reconfigure rqt_reconfigure
+  - reconfigure:
+      layaut: tiled
+      panes:
+        - ros2 run rqt_reconfigure rqt_reconfigure
   - layout:
       layout: tiled
       panes:

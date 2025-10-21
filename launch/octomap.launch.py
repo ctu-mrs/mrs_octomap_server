@@ -8,9 +8,11 @@ from launch_ros.descriptions import ComposableNode
 from launch.actions import DeclareLaunchArgument
 from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import (
+        IfElseSubstitution,
         EnvironmentVariable,
         LaunchConfiguration,
         PathJoinSubstitution,
+        PythonExpression,
         )
 
 from ament_index_python.packages import get_package_share_directory
@@ -146,7 +148,7 @@ def generate_launch_description():
             ("~/lidar_3d_0_over_max_range_in", lidar_3d_omr_0),
             # Other remappings
             ("~/control_manager_diagnostics_in", "control_manager/diagnostics"),
-            ("~/height_in", "odometry/height"),
+            ("~/height_in", "estimation_manager/height_agl"),
             ("~/clear_box_in", "uav_pose_estimator/clear_box"),
             # topics out
             ("~/octomap_global_full_out", "~/octomap_global_full"),
