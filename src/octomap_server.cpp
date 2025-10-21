@@ -94,6 +94,8 @@ typedef struct
   double free_ray_distance_unknown;
   bool   decimation_enabled;
   double decimation_voxel_size;
+  bool   crop_body_enabled;
+  double crop_body_box_size;
 } SensorParams3DLidar_t;
 
 typedef struct
@@ -109,6 +111,8 @@ typedef struct
   double free_ray_distance_unknown;
   bool   decimation_enabled;
   double decimation_voxel_size;
+  bool   crop_body_enabled;
+  double crop_body_box_size;
 } SensorParamsDepthCam_t;
 
 #ifdef COLOR_OCTOMAP_SERVER
@@ -441,6 +445,12 @@ void OctomapServer::initialize() {
     std::stringstream decimation_size_param_name;
     decimation_size_param_name << "sensor_params/depth_camera/sensor_" << i << "/decimation/voxel_size";
 
+    std::stringstream crop_body_enabled_param_name;
+    crop_body_enabled_param_name << "sensor_params/depth_camera/sensor_" << i << "/crop_robot_body/enabled";
+
+    std::stringstream crop_body_box_size_param_name;
+    crop_body_box_size_param_name << "sensor_params/depth_camera/sensor_" << i << "/crop_robot_body/box_size";
+
     SensorParamsDepthCam_t params;
 
     param_loader.loadParam(max_range_param_name.str(), params.max_range);
@@ -454,6 +464,8 @@ void OctomapServer::initialize() {
     param_loader.loadParam(free_ray_distance_unknown_param_name.str(), params.free_ray_distance_unknown);
     param_loader.loadParam(decimation_enabled_param_name.str(), params.decimation_enabled);
     param_loader.loadParam(decimation_size_param_name.str(), params.decimation_voxel_size);
+    param_loader.loadParam(crop_body_enabled_param_name.str(), params.crop_body_enabled);
+    param_loader.loadParam(crop_body_box_size_param_name.str(), params.crop_body_box_size);
 
     sensor_params_depth_cam_.push_back(params);
   }
@@ -490,6 +502,12 @@ void OctomapServer::initialize() {
     std::stringstream decimation_size_param_name;
     decimation_size_param_name << "sensor_params/3d_lidar/sensor_" << i << "/decimation/voxel_size";
 
+    std::stringstream crop_body_enabled_param_name;
+    crop_body_enabled_param_name << "sensor_params/3d_lidar/sensor_" << i << "/crop_robot_body/enabled";
+
+    std::stringstream crop_body_box_size_param_name;
+    crop_body_box_size_param_name << "sensor_params/3d_lidar/sensor_" << i << "/crop_robot_body/box_size";
+
     SensorParams3DLidar_t params;
 
     param_loader.loadParam(max_range_param_name.str(), params.max_range);
@@ -502,6 +520,8 @@ void OctomapServer::initialize() {
     param_loader.loadParam(free_ray_distance_unknown_param_name.str(), params.free_ray_distance_unknown);
     param_loader.loadParam(decimation_enabled_param_name.str(), params.decimation_enabled);
     param_loader.loadParam(decimation_size_param_name.str(), params.decimation_voxel_size);
+    param_loader.loadParam(crop_body_enabled_param_name.str(), params.crop_body_enabled);
+    param_loader.loadParam(crop_body_box_size_param_name.str(), params.crop_body_box_size);
 
     sensor_params_3d_lidar_.push_back(params);
   }
@@ -603,11 +623,14 @@ void OctomapServer::initialize() {
 
   /* subscribers //{ */
 
+  rclcpp::QoS qos_profile = rclcpp::SensorDataQoS();
+
   mrs_lib::SubscriberHandlerOptions shopts;
   shopts.no_message_timeout = mrs_lib::no_timeout;
   shopts.threadsafe         = true;
   shopts.autostart          = true;
   shopts.node               = node_;
+  shopts.qos                = qos_profile;
 
   rclcpp::SubscriptionOptions subscription_options = rclcpp::SubscriptionOptions();
   subscription_options.callback_group              = cbkgrp_subs_;
@@ -956,38 +979,23 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
 
   // | ------------------ pointcloud decimation ----------------- |
 
+  bool   decimation_enabled    = false;
+  double decimation_voxel_size = 0.0;
+
   switch (sensor_type) {
 
     case LIDAR_3D: {
 
-      if (sensor_params_3d_lidar_[sensor_id].decimation_enabled) {
-
-        pcl::VoxelGrid<pcl::PointXYZ> voxel_filter;
-
-        voxel_filter.setInputCloud(pc);
-
-        voxel_filter.setLeafSize(sensor_params_3d_lidar_[sensor_id].decimation_voxel_size, sensor_params_3d_lidar_[sensor_id].decimation_voxel_size,
-                                 sensor_params_3d_lidar_[sensor_id].decimation_voxel_size);
-
-        voxel_filter.filter(*pc);
-      }
+      decimation_enabled    = sensor_params_3d_lidar_[sensor_id].decimation_enabled;
+      decimation_voxel_size = sensor_params_3d_lidar_[sensor_id].decimation_voxel_size;
 
       break;
     }
 
     case DEPTH_CAMERA: {
 
-      if (sensor_params_depth_cam_[sensor_id].decimation_enabled) {
-
-        pcl::VoxelGrid<pcl::PointXYZ> voxel_filter;
-
-        voxel_filter.setInputCloud(pc);
-
-        voxel_filter.setLeafSize(sensor_params_3d_lidar_[sensor_id].decimation_voxel_size, sensor_params_3d_lidar_[sensor_id].decimation_voxel_size,
-                                 sensor_params_3d_lidar_[sensor_id].decimation_voxel_size);
-
-        voxel_filter.filter(*pc);
-      }
+      decimation_enabled    = sensor_params_depth_cam_[sensor_id].decimation_enabled;
+      decimation_voxel_size = sensor_params_depth_cam_[sensor_id].decimation_voxel_size;
 
       break;
     }
@@ -997,8 +1005,63 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
     }
   }
 
+  if (decimation_enabled) {
+
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "decimating pointcloud");
+
+    pcl::VoxelGrid<pcl::PointXYZ> voxel_filter;
+
+    voxel_filter.setInputCloud(pc);
+
+    voxel_filter.setLeafSize(decimation_voxel_size, decimation_voxel_size, decimation_voxel_size);
+
+    voxel_filter.filter(*pc);
+  }
+
   // | ---------------------- robot removal --------------------- |
 
+  bool   crop_robot_enabled = false;
+  double crop_box_size      = 0.0;
+
+  switch (sensor_type) {
+
+    case LIDAR_3D: {
+
+      crop_robot_enabled = sensor_params_3d_lidar_[sensor_id].crop_body_enabled;
+      crop_box_size      = sensor_params_3d_lidar_[sensor_id].crop_body_box_size;
+
+      break;
+    }
+
+    case DEPTH_CAMERA: {
+
+      crop_robot_enabled = sensor_params_depth_cam_[sensor_id].crop_body_enabled;
+      crop_box_size      = sensor_params_depth_cam_[sensor_id].crop_body_box_size;
+
+      break;
+    }
+
+    default: {
+      break;
+    }
+  }
+
+  if (crop_robot_enabled) {
+
+    const octomap::point3d sensor_origin = vector3ToOctomap(sensorToWorldTf.transform.translation);
+
+    RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "cropping robot's body");
+
+    // Remove points around the drone (apply crop to downsampled result)
+    pcl::CropBox<pcl::PointXYZ> box_filter;
+    Eigen::Vector4f             min_point(-crop_box_size / 2.0, -crop_box_size / 2.0, -crop_box_size / 2.0, 1.0);
+    Eigen::Vector4f             max_point(crop_box_size / 2.0, crop_box_size / 2.0, crop_box_size / 2.0, 1.0);
+    box_filter.setMin(min_point);
+    box_filter.setMax(max_point);
+    box_filter.setInputCloud(pc);  // use downsampled_cloud as input
+    box_filter.setNegative(true);
+    box_filter.filter(*pc);
+  }
 
   // | ---------------- splitting the pointcloud ---------------- |
 
@@ -1453,16 +1516,6 @@ void OctomapServer::insertPointCloud(const geometry_msgs::msg::Vector3& sensorOr
   // const octomap::point3d sensor_origin = octomap::pointTfToOctomap(sensorOriginTf);
   const octomap::point3d sensor_origin = vector3ToOctomap(sensorOriginTf);
 
-  // Remove points around the drone (apply crop to downsampled result)
-  PCLPointCloud::Ptr          filtered_cloud = pcl::make_shared<PCLPointCloud>();
-  pcl::CropBox<pcl::PointXYZ> box_filter;
-  Eigen::Vector4f             min_point(sensor_origin.x() - box_size / 2.0f, sensor_origin.y() - box_size / 2.0f, sensor_origin.z() - box_size / 2.0f, 1.0f);
-  Eigen::Vector4f             max_point(sensor_origin.x() + box_size / 2.0f, sensor_origin.y() + box_size / 2.0f, sensor_origin.z() + box_size / 2.0f, 1.0f);
-  box_filter.setMin(min_point);
-  box_filter.setMax(max_point);
-  box_filter.setInputCloud(cloud);  // use downsampled_cloud as input
-  box_filter.setNegative(true);
-  box_filter.filter(*filtered_cloud);
 
   // Use the filtered cloud for the rest of the function
   const float     free_space_ray_len = std::min(float(free_ray_distance), float(sqrt(2 * pow(local_map_width / 2.0, 2) + pow(local_map_height / 2.0, 2))));
@@ -1471,7 +1524,7 @@ void OctomapServer::insertPointCloud(const geometry_msgs::msg::Vector3& sensorOr
   octomap::KeySet free_ends;
 
   // All measured points: make it free on ray, occupied on endpoint
-  for (PCLPointCloud::const_iterator it = filtered_cloud->begin(); it != filtered_cloud->end(); ++it) {
+  for (PCLPointCloud::const_iterator it = cloud->begin(); it != cloud->end(); ++it) {
 
     if (!(std::isfinite(it->x) && std::isfinite(it->y) && std::isfinite(it->z))) {
       continue;

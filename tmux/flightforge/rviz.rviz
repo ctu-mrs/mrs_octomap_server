@@ -19,7 +19,7 @@ Panels:
         - /TrajectoryGeneration1/path_original1/Namespaces1
         - /rgb1/Topic1
         - /global1
-        - /global1/free1/Status1
+        - /local1
       Splitter Ratio: 0.4477211833000183
     Tree Height: 712
   - Class: rviz_common/Selection
@@ -294,9 +294,7 @@ Visualization Manager:
           Enabled: true
           Name: path_final
           Namespaces:
-            ~/markers/final_out_lines: true
-            ~/markers/final_out_points: true
-            ~/markers/final_out_triangles: true
+            {}
           Topic:
             Depth: 5
             Durability Policy: Volatile
@@ -308,9 +306,7 @@ Visualization Manager:
           Enabled: true
           Name: path_original
           Namespaces:
-            ~/markers/original_out_lines: true
-            ~/markers/original_out_points: true
-            ~/markers/original_out_triangles: true
+            {}
           Topic:
             Depth: 5
             Durability Policy: Volatile
@@ -335,7 +331,7 @@ Visualization Manager:
       Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
-      Max Intensity: 1999.7901611328125
+      Max Intensity: 1999.5189208984375
       Min Color: 0; 0; 0
       Min Intensity: -1
       Name: lidar
@@ -528,7 +524,7 @@ Visualization Manager:
           Voxel Coloring: Z-Axis
           Voxel Rendering: Occupied Voxels
         - Class: octomap_rviz_plugins/OccupancyGrid
-          Enabled: true
+          Enabled: false
           Max. Height Display: 3.4028234663852886e+38
           Max. Octree Depth: 16
           Min. Height Display: -3.4028234663852886e+38
@@ -540,12 +536,50 @@ Visualization Manager:
             History Policy: Keep Last
             Reliability Policy: Reliable
             Value: /uav1/octomap_server/octomap_global_binary
+          Value: false
+          Voxel Alpha: 0.20000000298023224
+          Voxel Coloring: Z-Axis
+          Voxel Rendering: All Voxels
+      Enabled: false
+      Name: global
+    - Class: rviz_common/Group
+      Displays:
+        - Class: octomap_rviz_plugins/OccupancyGrid
+          Enabled: true
+          Max. Height Display: 3.4028234663852886e+38
+          Max. Octree Depth: 16
+          Min. Height Display: -3.4028234663852886e+38
+          Name: occupied
+          Topic:
+            Depth: 5
+            Durability Policy: Volatile
+            Filter size: 10
+            History Policy: Keep Last
+            Reliability Policy: Reliable
+            Value: /uav1/octomap_server/octomap_local_binary
           Value: true
+          Voxel Alpha: 1
+          Voxel Coloring: Z-Axis
+          Voxel Rendering: Occupied Voxels
+        - Class: octomap_rviz_plugins/OccupancyGrid
+          Enabled: false
+          Max. Height Display: 3.4028234663852886e+38
+          Max. Octree Depth: 16
+          Min. Height Display: -3.4028234663852886e+38
+          Name: free
+          Topic:
+            Depth: 5
+            Durability Policy: Volatile
+            Filter size: 10
+            History Policy: Keep Last
+            Reliability Policy: Reliable
+            Value: /uav1/octomap_server/octomap_local_binary
+          Value: false
           Voxel Alpha: 0.20000000298023224
           Voxel Coloring: Z-Axis
           Voxel Rendering: All Voxels
       Enabled: true
-      Name: global
+      Name: local
   Enabled: true
   Global Options:
     Background Color: 255; 255; 255
@@ -592,7 +626,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 44.187461853027344
+      Distance: 12.175559997558594
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -607,10 +641,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.4752019941806793
+      Pitch: 0.7352020740509033
       Target Frame: uav1/fcu
       Value: Orbit (rviz)
-      Yaw: 2.173292398452759
+      Yaw: 2.701456308364868
     Saved: ~
 Window Geometry:
   Displays:

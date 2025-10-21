@@ -37,7 +37,7 @@ windows:
   - mapping:
       layout: tiled
       panes:
-        - ros2 launch mrs_octomap_server octomap.launch.py custom_config:=./config/octomap_server.yaml lidar_3d_0:=lidar/points
+        - ros2 launch mrs_octomap_server octomap.launch.py custom_config:=./config/octomap_server.yaml lidar_3d_0:=lidar/pointss depth_camera_0:=stereo/points2 camera_info_0:=stereo/left/camera_info
   - takeoff:
       layout: tiled
       panes:
@@ -46,10 +46,10 @@ windows:
       layout: tiled
       panes:
         - waitForCore; ./takeoff.sh
-  # - stereo:
-  #     layout: tiled
-  #     panes:
-  #       - ros2 launch stereo_image_proc stereo_image_proc.launch.py namespace:=uav1/stereo
+  - stereo:
+      layout: tiled
+      panes:
+        - ros2 launch stereo_image_proc stereo_image_proc.launch.py namespace:=uav1/stereo
   - goto:
       layout: tiled
       panes:

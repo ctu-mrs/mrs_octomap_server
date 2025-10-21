@@ -125,6 +125,42 @@ def generate_launch_description():
 
     # #} end of lidar_3d_omr_0
 
+    # #{ depth_camera_0
+
+    depth_camera_0 = LaunchConfiguration('depth_camera_0')
+
+    ld.add_action(DeclareLaunchArgument(
+        'depth_camera_0',
+        default_value='~/depth_camera_0_in',
+        description='Depth camera #0 topic'
+    ))
+
+    # #} end of depth_camera_0
+
+    # #{ camera_info_0
+
+    camera_info_0 = LaunchConfiguration('camera_info_0')
+
+    ld.add_action(DeclareLaunchArgument(
+        'camera_info_0',
+        default_value='~/camera_info_0_in',
+        description='Depth camera #0 info'
+    ))
+
+    # #} end of camera_info_0
+
+    # #{ depth_camera_omr_0
+
+    depth_camera_omr_0 = LaunchConfiguration('depth_camera_omr_0')
+
+    ld.add_action(DeclareLaunchArgument(
+        'depth_camera_omr_0',
+        default_value='~/depth_camera_0_omr_in',
+        description='Depth camera #0 Over Max Range topic'
+    ))
+
+    # #} end of depth_camera_omr_0
+
     # #} end of topics in
 
     # #{ octomap server node
@@ -146,6 +182,9 @@ def generate_launch_description():
         remappings=[
             ("~/lidar_3d_0_in", lidar_3d_0),
             ("~/lidar_3d_0_over_max_range_in", lidar_3d_omr_0),
+            ("~/depth_camera_0_in", depth_camera_0),
+            ("~/camera_info_0_in", camera_info_0),
+            ("~/depth_camera_0_over_max_range_in", depth_camera_omr_0),
             # Other remappings
             ("~/control_manager_diagnostics_in", "control_manager/diagnostics"),
             ("~/height_in", "estimation_manager/height_agl"),
@@ -201,7 +240,6 @@ def generate_launch_description():
         arguments = ['--ros-args', '--log-level', LaunchConfiguration('log_level')],
         composable_node_descriptions=[octomap_server_node],
         condition = IfCondition(standalone)
-
     ))
 
     # #} end of standalone container

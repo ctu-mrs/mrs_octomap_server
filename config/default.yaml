@@ -69,6 +69,10 @@ sensor_params:
         enabled: true
         voxel_size: 0.4 # [m]
 
+      crop_robot_body:
+        enabled: true
+        box_size: 2.0 # [m]
+
       # what to do when data in the organized pointcloud is missing (is nan)
       unknown_rays:
         update_free_space: true # update free space when data at the specific point is missing?
@@ -93,6 +97,10 @@ sensor_params:
       decimation:
         enabled: true
         voxel_size: 0.4 # [m]
+
+      crop_robot_body:
+        enabled: true
+        box_size: 2.0 # [m]
 
       # what to do when data in the organized pointcloud is missing (is nan)
       unknown_rays:
