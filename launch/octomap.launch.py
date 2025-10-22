@@ -101,6 +101,8 @@ def generate_launch_description():
 
     # #{ subscriber topics through arguments
 
+    # id 0
+
     # #{ lidar_3d_0
 
     lidar_3d_0 = LaunchConfiguration('lidar_3d_0')
@@ -161,6 +163,68 @@ def generate_launch_description():
 
     # #} end of depth_camera_omr_0
 
+    # id 1
+
+    # #{ lidar_3d_1
+
+    lidar_3d_1 = LaunchConfiguration('lidar_3d_1')
+
+    ld.add_action(DeclareLaunchArgument(
+        'lidar_3d_1',
+        default_value='~/lidar_3d_1_in',
+        description='Lidar 3D #1 topic'
+    ))
+
+    # #} end of lidar_3d_1
+
+    # #{ lidar_3d_omr_1
+
+    lidar_3d_omr_1 = LaunchConfiguration('lidar_3d_omr_1')
+
+    ld.add_action(DeclareLaunchArgument(
+        'lidar_3d_omr_1',
+        default_value='~/lidar_3d_1_omr_in',
+        description='Lidar 3D #1 Over Max Range topic'
+    ))
+
+    # #} end of lidar_3d_omr_1
+
+    # #{ depth_camera_1
+
+    depth_camera_1 = LaunchConfiguration('depth_camera_1')
+
+    ld.add_action(DeclareLaunchArgument(
+        'depth_camera_1',
+        default_value='~/depth_camera_1_in',
+        description='Depth camera #1 topic'
+    ))
+
+    # #} end of depth_camera_1
+
+    # #{ camera_info_1
+
+    camera_info_1 = LaunchConfiguration('camera_info_1')
+
+    ld.add_action(DeclareLaunchArgument(
+        'camera_info_1',
+        default_value='~/camera_info_1_in',
+        description='Depth camera #1 info'
+    ))
+
+    # #} end of camera_info_1
+
+    # #{ depth_camera_omr_1
+
+    depth_camera_omr_1 = LaunchConfiguration('depth_camera_omr_1')
+
+    ld.add_action(DeclareLaunchArgument(
+        'depth_camera_omr_1',
+        default_value='~/depth_camera_1_omr_in',
+        description='Depth camera #1 Over Max Range topic'
+    ))
+
+    # #} end of depth_camera_omr_1
+
     # #} end of topics in
 
     # #{ octomap server node
@@ -180,11 +244,18 @@ def generate_launch_description():
             {'custom_config': custom_config},
         ],
         remappings=[
+            # sensors #0
             ("~/lidar_3d_0_in", lidar_3d_0),
             ("~/lidar_3d_0_over_max_range_in", lidar_3d_omr_0),
             ("~/depth_camera_0_in", depth_camera_0),
             ("~/camera_info_0_in", camera_info_0),
             ("~/depth_camera_0_over_max_range_in", depth_camera_omr_0),
+            # sensors #1
+            ("~/lidar_3d_1_in", lidar_3d_1),
+            ("~/lidar_3d_1_over_max_range_in", lidar_3d_omr_1),
+            ("~/depth_camera_1_in", depth_camera_1),
+            ("~/camera_info_1_in", camera_info_1),
+            ("~/depth_camera_1_over_max_range_in", depth_camera_omr_1),
             # Other remappings
             ("~/control_manager_diagnostics_in", "control_manager/diagnostics"),
             ("~/height_in", "estimation_manager/height_agl"),
