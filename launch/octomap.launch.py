@@ -96,8 +96,29 @@ def generate_launch_description():
 
     # #{ frame ids
 
-    world_frame_id = PathJoinSubstitution([uav_name, 'world_origin'])
-    robot_frame_id = PathJoinSubstitution([uav_name, 'fcu'])
+    # #{ world_frame
+
+    world_frame = LaunchConfiguration('world_frame')
+
+    ld.add_action(DeclareLaunchArgument(
+        'world_frame',
+        default_value=[uav_name, "/fixed_origin"],
+        description='The frame id of the world frame for the mapping.'
+    ))
+
+    # #} end of world_frame
+
+    # #{ robot_frame
+
+    robot_frame = LaunchConfiguration('robot_frame')
+
+    ld.add_action(DeclareLaunchArgument(
+        'robot_frame',
+        default_value=[uav_name, "/fcu"],
+        description='The frame id of the robots body.',
+    ))
+
+    # #} end of robot_frame
 
     # #} end of frame ids
 
@@ -239,8 +260,8 @@ def generate_launch_description():
         parameters=[
             {"uav_name": uav_name},
             {"use_sim_time": use_sim_time},
-            {"world_frame_id": world_frame_id},
-            {"robot_frame_id": robot_frame_id},
+            {"world_frame_id": world_frame},
+            {"robot_frame_id": robot_frame},
             {"map_path": "/tmp"},
             {"public_config": this_pkg_path+'/config/default.yaml'},
             {'custom_config': custom_config},
