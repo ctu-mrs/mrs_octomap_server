@@ -23,18 +23,11 @@ mrs_uav_flightforge_simulator:
     lidar:
 
       enabled: true
-      horizontal_rays: 64 # [-]
+      horizontal_rays: 128 # [-]
       vertical_rays: 64 # [-]
 
-      offset:
-        x: 0.0 # [m]
-        y: 0.0 # [m]
-        z: 0.1 # [m]
-
-      rotation:
-        pitch: 0.0 # [deg]
-        roll: 0.0 # [deg]
-        yaw: 0.0 # [deg]
+      vertical_fov_up: 45.0 # [deg]
+      vertical_fov_down: 45.0 # [deg]
 
       lidar_segmented:
         enabled: false

@@ -26,18 +26,16 @@ def generate_launch_description():
     this_pkg_path = get_package_share_directory(pkg_name)
 
     # #{ uav_name
+
+    uav_name = LaunchConfiguration('uav_name')
+
     ld.add_action(DeclareLaunchArgument(
         'uav_name',
-        default_value=EnvironmentVariable('UAV_NAME',default_value='uav1'),
-        description="The uav name used for namespacing",
+        default_value=os.getenv('UAV_NAME', "uav1"),
+        description="The uav name used for namespacing.",
     ))
-    # # }
 
-    # uav_name = LaunchConfiguration('uav_name')
-    uav_name=os.getenv('UAV_NAME', "uav1")
-    # # } end of uav_name.
-
-    namespace = 'waypoint_flier',
+    # #} end of custom_config
 
     # #{ log_level
 
@@ -45,15 +43,19 @@ def generate_launch_description():
 
     # #} end of log_level
 
-    # # { standalone
-
-    ld.add_action(DeclareLaunchArgument(
-        'standalone',
-        default_value='true'
-    ))
-
+    # #{ standalone
+    
     standalone = LaunchConfiguration('standalone')
-    # #}
+    
+    declare_standalone = DeclareLaunchArgument(
+        'standalone',
+        default_value='true',
+        description='Whether to start a as a standalone or load into an existing container.'
+    )
+    
+    ld.add_action(declare_standalone)
+    
+    # #} end of standalone
 
     # #{ use_sim_time
 
@@ -109,23 +111,23 @@ def generate_launch_description():
 
     ld.add_action(DeclareLaunchArgument(
         'lidar_3d_0',
-        default_value='~/lidar_3d_0_in',
-        description='Lidar 3D #0 topic'
+        default_value='~/lidar_3d_0/points_in',
+        description='Lidar 3D #0 points topic'
     ))
 
     # #} end of lidar_3d_0
 
-    # #{ lidar_3d_omr_0
+    # #{ lidar_3d_0_free
 
-    lidar_3d_omr_0 = LaunchConfiguration('lidar_3d_omr_0')
+    lidar_3d_0_free = LaunchConfiguration('lidar_3d_0_free')
 
     ld.add_action(DeclareLaunchArgument(
-        'lidar_3d_omr_0',
-        default_value='~/lidar_3d_0_omr_in',
-        description='Lidar 3D #0 Over Max Range topic'
+        'lidar_3d_0_free',
+        default_value='~/lidar_3d_0/free_points_in',
+        description='Lidar 3D #0 free points topic'
     ))
 
-    # #} end of lidar_3d_omr_0
+    # #} end of lidar_3d_0_free
 
     # #{ depth_camera_0
 
@@ -133,8 +135,8 @@ def generate_launch_description():
 
     ld.add_action(DeclareLaunchArgument(
         'depth_camera_0',
-        default_value='~/depth_camera_0_in',
-        description='Depth camera #0 topic'
+        default_value='~/depth_camera_0/points_in',
+        description='Depth camera #0 points topic'
     ))
 
     # #} end of depth_camera_0
@@ -145,23 +147,23 @@ def generate_launch_description():
 
     ld.add_action(DeclareLaunchArgument(
         'camera_info_0',
-        default_value='~/camera_info_0_in',
+        default_value='~/depth_camera/camera_info_in',
         description='Depth camera #0 info'
     ))
 
     # #} end of camera_info_0
 
-    # #{ depth_camera_omr_0
+    # #{ depth_camera_0_free
 
-    depth_camera_omr_0 = LaunchConfiguration('depth_camera_omr_0')
+    depth_camera_0_free = LaunchConfiguration('depth_camera_0_free')
 
     ld.add_action(DeclareLaunchArgument(
-        'depth_camera_omr_0',
-        default_value='~/depth_camera_0_omr_in',
-        description='Depth camera #0 Over Max Range topic'
+        'depth_camera_0_free',
+        default_value='~/depth_camera_0/free_points_in',
+        description='Depth camera #0 free points topic'
     ))
 
-    # #} end of depth_camera_omr_0
+    # #} end of depth_camera_0_free
 
     # id 1
 
@@ -171,23 +173,23 @@ def generate_launch_description():
 
     ld.add_action(DeclareLaunchArgument(
         'lidar_3d_1',
-        default_value='~/lidar_3d_1_in',
-        description='Lidar 3D #1 topic'
+        default_value='~/lidar_3d_1/points_in',
+        description='Lidar 3D #0 points topic'
     ))
 
     # #} end of lidar_3d_1
 
-    # #{ lidar_3d_omr_1
+    # #{ lidar_3d_1_free
 
-    lidar_3d_omr_1 = LaunchConfiguration('lidar_3d_omr_1')
+    lidar_3d_1_free = LaunchConfiguration('lidar_3d_1_free')
 
     ld.add_action(DeclareLaunchArgument(
-        'lidar_3d_omr_1',
-        default_value='~/lidar_3d_1_omr_in',
-        description='Lidar 3D #1 Over Max Range topic'
+        'lidar_3d_1_free',
+        default_value='~/lidar_3d_1/free_points_in',
+        description='Lidar 3D #0 free points topic'
     ))
 
-    # #} end of lidar_3d_omr_1
+    # #} end of lidar_3d_1_free
 
     # #{ depth_camera_1
 
@@ -195,8 +197,8 @@ def generate_launch_description():
 
     ld.add_action(DeclareLaunchArgument(
         'depth_camera_1',
-        default_value='~/depth_camera_1_in',
-        description='Depth camera #1 topic'
+        default_value='~/depth_camera_1/points_in',
+        description='Depth camera #0 points topic'
     ))
 
     # #} end of depth_camera_1
@@ -207,23 +209,23 @@ def generate_launch_description():
 
     ld.add_action(DeclareLaunchArgument(
         'camera_info_1',
-        default_value='~/camera_info_1_in',
-        description='Depth camera #1 info'
+        default_value='~/depth_camera/camera_info_in',
+        description='Depth camera #0 info'
     ))
 
     # #} end of camera_info_1
 
-    # #{ depth_camera_omr_1
+    # #{ depth_camera_free_1
 
-    depth_camera_omr_1 = LaunchConfiguration('depth_camera_omr_1')
+    depth_camera_1_free = LaunchConfiguration('depth_camera_1_free')
 
     ld.add_action(DeclareLaunchArgument(
-        'depth_camera_omr_1',
-        default_value='~/depth_camera_1_omr_in',
-        description='Depth camera #1 Over Max Range topic'
+        'depth_camera_1_free',
+        default_value='~/depth_camera_1/free_points_in',
+        description='Depth camera #0 free points topic'
     ))
 
-    # #} end of depth_camera_omr_1
+    # #} end of depth_camera_1_free
 
     # #} end of topics in
 
@@ -245,17 +247,17 @@ def generate_launch_description():
         ],
         remappings=[
             # sensors #0
-            ("~/lidar_3d_0_in", lidar_3d_0),
-            ("~/lidar_3d_0_over_max_range_in", lidar_3d_omr_0),
-            ("~/depth_camera_0_in", depth_camera_0),
-            ("~/camera_info_0_in", camera_info_0),
-            ("~/depth_camera_0_over_max_range_in", depth_camera_omr_0),
-            # sensors #1
-            ("~/lidar_3d_1_in", lidar_3d_1),
-            ("~/lidar_3d_1_over_max_range_in", lidar_3d_omr_1),
-            ("~/depth_camera_1_in", depth_camera_1),
-            ("~/camera_info_1_in", camera_info_1),
-            ("~/depth_camera_1_over_max_range_in", depth_camera_omr_1),
+            ("~/lidar_3d_0/points_in", lidar_3d_0),
+            ("~/lidar_3d_0/free_points_in", lidar_3d_0_free),
+            ("~/depth_camera_0/points_in", depth_camera_0),
+            ("~/depth_camera_0/points_free_in", depth_camera_0_free),
+            ("~/depth_camera_0/camera_info_in", camera_info_0),
+            # sensors #0
+            ("~/lidar_3d_1/points_in", lidar_3d_1),
+            ("~/lidar_3d_1/free_points_in", lidar_3d_1_free),
+            ("~/depth_camera_1/points_in", depth_camera_1),
+            ("~/depth_camera_1/points_free_in", depth_camera_1_free),
+            ("~/depth_camera_1/camera_info_in", camera_info_1),
             # Other remappings
             ("~/control_manager_diagnostics_in", "control_manager/diagnostics"),
             ("~/height_in", "estimation_manager/height_agl"),
