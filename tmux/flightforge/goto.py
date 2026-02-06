@@ -14,16 +14,16 @@ class Goto(Node):
 
         self.get_logger().info('Setting up the client')
 
-        self.client = self.create_client(ReferenceStampedSrv, "/uav1/control_manager/reference")
+        self.client = self.create_client(ReferenceStampedSrv, "/uav1/octomap_planner/reference")
 
         while not self.client.wait_for_service(timeout_sec=3.0):
             self.get_logger().info('service not available, waiting again...')
 
         request = ReferenceStampedSrv.Request()
-        request.header.frame_id = "fcu_untilted"
-        request.reference.position.x = 10.0
-        request.reference.position.y = 10.0
-        request.reference.position.z = 0.0
+        request.header.frame_id = "local_origin"
+        request.reference.position.x = 100.0
+        request.reference.position.y = 0.0
+        request.reference.position.z = 2.0
         request.reference.heading = 1.57
 
         self.future = self.client.call_async(request)
