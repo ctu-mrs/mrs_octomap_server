@@ -1,4 +1,4 @@
-resolution: 0.4 # [m]
+resolution: 0.5 # [m]
 
 # for point cloud raycasting
 sensor_params:
@@ -9,24 +9,24 @@ sensor_params:
 
     sensor_0:
 
-      max_range: 40.0 # [m] max range of points to be included as occupied, free space is updated up to min(max_range, free_ray_distance)
-      free_ray_distance: 40.0 # [m] max distance for free space raycasting
+      max_range: 20.0 # [m] max range of points to be included as occupied, free space is updated up to min(max_range, free_ray_distance)
+      free_ray_distance: 10.0 # [m] max distance for free space raycasting
 
       vertical_fov_angle: 90.0 # [deg]
 
       # fallback values used for free space raycasting for missing data, uses pointcloud dimensions from the incoming message by default
-      vertical_rays: 128 # [-]
+      vertical_rays: 64 # [-]
       horizontal_rays: 64 # [-]
 
       # what to do when data in the organized pointcloud is missing (is nan)
       unknown_rays:
         update_free_space: true # update free space when data at the specific point is missing?
         clear_occupied: true # clear occupied voxels using unknown rays? BEWARE, setting this to true is very DANGEROUS
-        free_ray_distance_unknown: 20.0 # [m] ray length for raycasting
+        free_ray_distance_unknown: 10.0 # [m] ray length for raycasting
 
       decimation:
         enabled: true
-        voxel_size: 0.4 # [m]
+        voxel_size: 0.5 # [m]
 
       crop_robot_body:
         enabled: true

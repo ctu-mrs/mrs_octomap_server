@@ -1621,37 +1621,36 @@ void OctomapServer::insertPointCloud(const geometry_msgs::msg::Vector3& sensorOr
   }
 
   // CROP THE MAP AROUND THE ROBOT
-  // TODO?
-  /* { */
-  /*   mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer(node_, "OctomapServer::localMapCopy", scope_timer_logger_, _scope_timer_enabled_); */
+  {
+    mrs_lib::ScopeTimer timer = mrs_lib::ScopeTimer(node_, "OctomapServer::localMapCopy", scope_timer_logger_, _scope_timer_enabled_);
 
-  /*   auto [local_map_width, local_map_height] = mrs_lib::get_mutexed(mutex_local_map_dimensions_, local_map_width_, local_map_height_); */
+    auto [local_map_width, local_map_height] = mrs_lib::get_mutexed(mutex_local_map_dimensions_, local_map_width_, local_map_height_);
 
-  /*   float x        = sensor_origin.x(); */
-  /*   float y        = sensor_origin.y(); */
-  /*   float z        = sensor_origin.z(); */
-  /*   float width_2  = local_map_width / 2.0; */
-  /*   float height_2 = local_map_height / 2.0; */
+    float x        = sensor_origin.x();
+    float y        = sensor_origin.y();
+    float z        = sensor_origin.z();
+    float width_2  = local_map_width / 2.0;
+    float height_2 = local_map_height / 2.0;
 
-  /*   octomap::point3d roi_min(x - width_2, y - width_2, z - height_2); */
-  /*   octomap::point3d roi_max(x + width_2, y + width_2, z + height_2); */
+    octomap::point3d roi_min(x - width_2, y - width_2, z - height_2);
+    octomap::point3d roi_max(x + width_2, y + width_2, z + height_2);
 
-  /*   std::shared_ptr<OcTree_t> from; */
+    std::shared_ptr<OcTree_t> from;
 
-  /*   if (octree_local_idx_ == 0) { */
-  /*     from              = octree_local_0_; */
-  /*     octree_local_     = octree_local_1_; */
-  /*     octree_local_idx_ = 1; */
-  /*   } else { */
-  /*     from              = octree_local_1_; */
-  /*     octree_local_     = octree_local_0_; */
-  /*     octree_local_idx_ = 0; */
-  /*   } */
+    if (octree_local_idx_ == 0) {
+      from              = octree_local_0_;
+      octree_local_     = octree_local_1_;
+      octree_local_idx_ = 1;
+    } else {
+      from              = octree_local_1_;
+      octree_local_     = octree_local_0_;
+      octree_local_idx_ = 0;
+    }
 
-  /*   octree_local_->clear(); */
+    octree_local_->clear();
 
-  /*   copyInsideBBX2(from, octree_local_, roi_min, roi_max); */
-  /* } */
+    copyInsideBBX2(from, octree_local_, roi_min, roi_max);
+  }
 
   // Set free space in the bounding box specified by clear_box topic
   /* if (sh_clear_box_.hasMsg()) { */

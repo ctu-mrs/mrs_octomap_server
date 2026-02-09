@@ -1,0 +1,16 @@
+planning_tree:
+  resolution: 0.5
+
+distance_transform:
+  submap_distance: 20.0 # [m] from the UAV into all directions
+
+main_timer:
+  rate: 20.0 # [Hz]
+
+diagnostics_timer:
+  rate: 10.0 # [Hz]
+
+safe_obstacle_distance: 
+  default: 1.0 # [m]
+  min: 0.6 # [m]
+  max: 5.0 # [m]
