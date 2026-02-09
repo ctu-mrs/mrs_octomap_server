@@ -43,7 +43,7 @@ windows:
   - planning:
       layout: tiled
       panes:
-        - ros2 launch mrs_octomap_planner octomap_planner.launch.py
+        - ros2 launch mrs_octomap_planner octomap_planner.launch.py custom_config:=./config/octomap_planner.yaml
         - 'history -s ./goto.py'
   - takeoff:
       layout: tiled

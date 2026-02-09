@@ -1,4 +1,4 @@
-resolution: 0.5 # [m]
+resolution: 0.4 # [m]
 
 # for point cloud raycasting
 sensor_params:
@@ -15,7 +15,7 @@ sensor_params:
       vertical_fov_angle: 90.0 # [deg]
 
       # fallback values used for free space raycasting for missing data, uses pointcloud dimensions from the incoming message by default
-      vertical_rays: 64 # [-]
+      vertical_rays: 128 # [-]
       horizontal_rays: 64 # [-]
 
       # what to do when data in the organized pointcloud is missing (is nan)
@@ -26,7 +26,7 @@ sensor_params:
 
       decimation:
         enabled: true
-        voxel_size: 0.5 # [m]
+        voxel_size: 0.4 # [m]
 
       crop_robot_body:
         enabled: true
