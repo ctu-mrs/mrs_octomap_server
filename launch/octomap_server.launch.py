@@ -44,17 +44,17 @@ def generate_launch_description():
     # #} end of log_level
 
     # #{ standalone
-    
+
     standalone = LaunchConfiguration('standalone')
-    
+
     declare_standalone = DeclareLaunchArgument(
         'standalone',
         default_value='true',
         description='Whether to start a as a standalone or load into an existing container.'
     )
-    
+
     ld.add_action(declare_standalone)
-    
+
     # #} end of standalone
 
     # #{ use_sim_time
