@@ -273,7 +273,7 @@ def generate_launch_description():
             ("~/depth_camera_0/points_in", depth_camera_0),
             ("~/depth_camera_0/points_free_in", depth_camera_0_free),
             ("~/depth_camera_0/camera_info_in", camera_info_0),
-            # sensors #0
+            # sensors #1
             ("~/lidar_3d_1/points_in", lidar_3d_1),
             ("~/lidar_3d_1/free_points_in", lidar_3d_1_free),
             ("~/depth_camera_1/points_in", depth_camera_1),

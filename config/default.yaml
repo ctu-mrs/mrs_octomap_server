@@ -1,119 +1,123 @@
-map_while_grounded: true
+mrs_octomap_server:
 
-map_resolution: 0.4 # [m]
+  octomap_server:
 
-scope_timer:
-  enabled: false
-  log_filename: "/tmp/scope_timer_trajectory_generation.txt"
+    map_resolution: 0.4 # [m]
 
-local_map:
+    map_while_grounded: true
 
-  # the bounding box distance of the local map
-  size:
-    max_width: 30 # [m] max width of the local map
-    max_height: 15 # [m] max height of the local map
-    min_width: 20 # [m] min width of the local map
-    min_height: 10 # [m] min height of the local map
-    duty_high_threshold: 0.9 # [s] if inserting scan takes more time than this, decrease local map size
-    duty_low_threshold: 0.8 # [s] if inserting scan takes less time than this, increase local map size
+    local_map:
 
-  # the publisher rate of the local map
-  publisher_rate: 10.0 # [Hz]
+      # the bounding box distance of the local map
+      size:
+        max_width: 30 # [m] max width of the local map
+        max_height: 15 # [m] max height of the local map
+        min_width: 20 # [m] min width of the local map
+        min_height: 10 # [m] min height of the local map
+        duty_high_threshold: 0.9 # [s] if inserting scan takes more time than this, decrease local map size
+        duty_low_threshold: 0.8 # [s] if inserting scan takes less time than this, increase local map size
 
-  publish_full: false # should publish map with full probabilities?
-  publish_binary: true # should publish map with binary occupancy?
+      # the publisher rate of the local map
+      publisher_rate: 10.0 # [Hz]
 
-global_map:
+      publish_full: false # should publish map with full probabilities?
+      publish_binary: true # should publish map with binary occupancy?
 
-  size: 80.0 # [m]
+    global_map:
 
-  # should create a global map from the local map?
-  enabled: true
+      size: 80.0 # [m]
 
-  # the publisher rate of the global map
-  publisher_rate: 1.0 # [Hz]
+      # should create a global map from the local map?
+      enabled: true
 
-  # the rate of inserting the local map into the global map
-  creation_rate: 1.0 # [Hz]
+      # the publisher rate of the global map
+      publisher_rate: 1.0 # [Hz]
 
-  # should we prune the map before publishing?
-  compress: true
+      # the rate of inserting the local map into the global map
+      creation_rate: 1.0 # [Hz]
 
-  publish_full: false # should publish map with full probabilities?
-  publish_binary: true # should publish map with binary occupancy?
+      # should we prune the map before publishing?
+      compress: true
 
-# for point cloud raycasting
-sensor_params:
+      publish_full: false # should publish map with full probabilities?
+      publish_binary: true # should publish map with binary occupancy?
 
-  3d_lidar:
+    # for point cloud raycasting
+    sensor_params:
 
-    n_sensors: 1
+      3d_lidar:
 
-    sensor_0:
+        n_sensors: 1
 
-      max_range: 20.0 # [m] max range of points to be included as occupied, free space is updated up to min(max_range, free_ray_distance)
-      free_ray_distance: 15.0 # [m] max distance for free space raycasting
+        sensor_0:
 
-      # fallback values used for free space raycasting for missing data, uses pointcloud dimensions from the incoming message by default
-      vertical_fov_angle: 1.57 # [rad]
-      vertical_rays: 128 # [-]
-      horizontal_rays: 128 # [-]
+          max_range: 20.0 # [m] max range of points to be included as occupied, free space is updated up to min(max_range, free_ray_distance)
+          free_ray_distance: 15.0 # [m] max distance for free space raycasting
 
-      decimation:
-        enabled: true
-        voxel_size: 0.4 # [m]
+          # fallback values used for free space raycasting for missing data, uses pointcloud dimensions from the incoming message by default
+          vertical_fov_angle: 1.57 # [rad]
+          vertical_rays: 128 # [-]
+          horizontal_rays: 128 # [-]
 
-      crop_robot_body:
-        enabled: true
-        box_size: 2.0 # [m]
+          decimation:
+            enabled: false
+            voxel_size: 0.4 # [m]
 
-      # what to do when data in the organized pointcloud is missing (is nan)
-      unknown_rays:
-        update_free_space: true # update free space when data at the specific point is missing?
-        clear_occupied: true # clear occupied voxels using unknown rays? BEWARE, setting this to true is very DANGEROUS
-        free_ray_distance_unknown: 20.0 # [m] ray length for raycasting
+          crop_robot_body:
+            enabled: false
+            box_size: 2.0 # [m]
 
-  depth_camera:
+          # what to do when data in the organized pointcloud is missing (is nan)
+          unknown_rays:
+            update_free_space: true # update free space when data at the specific point is missing?
+            clear_occupied: true # clear occupied voxels using unknown rays? BEWARE, setting this to true is very DANGEROUS
+            free_ray_distance_unknown: 20.0 # [m] ray length for raycasting
 
-    n_sensors: 1
+      depth_camera:
 
-    sensor_0:
+        n_sensors: 0
 
-      max_range: 20.0 # [m] max range of points to be included as occupied, free space is updated up to min(max_range, free_ray_distance)
-      free_ray_distance: 15.0 # [m] max distance for free space raycasting
+        sensor_0:
 
-      # fallback values used for free space raycasting for missing data, uses pointcloud dimensions and camera_info by default
-      horizontal_fov_angle: 1.221 # [rad]
-      vertical_fov_angle: 0.61 # [rad]
-      horizontal_rays: 80 # [-]
-      vertical_rays: 45 # [-]
+          max_range: 20.0 # [m] max range of points to be included as occupied, free space is updated up to min(max_range, free_ray_distance)
+          free_ray_distance: 15.0 # [m] max distance for free space raycasting
 
-      decimation:
-        enabled: true
-        voxel_size: 0.4 # [m]
+          # fallback values used for free space raycasting for missing data, uses pointcloud dimensions and camera_info by default
+          horizontal_fov_angle: 1.221 # [rad]
+          vertical_fov_angle: 0.61 # [rad]
+          horizontal_rays: 80 # [-]
+          vertical_rays: 45 # [-]
 
-      crop_robot_body:
-        enabled: true
-        box_size: 2.0 # [m]
+          decimation:
+            enabled: true
+            voxel_size: 0.4 # [m]
 
-      # what to do when data in the organized pointcloud is missing (is nan)
-      unknown_rays:
-        update_free_space: true # update free space when data at the specific point is missing?
-        clear_occupied: false # clear occupied voxels using unknown rays? BEWARE, setting this to true is very DANGEROUS
-        free_ray_distance_unknown: 20.0 # [m] ray length for raycasting
+          crop_robot_body:
+            enabled: true
+            box_size: 2.0 # [m]
 
-  2d_lidar:
+          # what to do when data in the organized pointcloud is missing (is nan)
+          unknown_rays:
+            update_free_space: true # update free space when data at the specific point is missing?
+            clear_occupied: false # clear occupied voxels using unknown rays? BEWARE, setting this to true is very DANGEROUS
+            free_ray_distance_unknown: 20.0 # [m] ray length for raycasting
 
-    n_sensors: 0
+      2d_lidar:
 
-    # sensor_0:
+        n_sensors: 0
 
-    #   max_range: 9.0 # [m]
-    #   horizontal_rays: 40
+        # sensor_0:
 
-sensor_model:
+        #   max_range: 9.0 # [m]
+        #   horizontal_rays: 40
 
-  hit: 0.95  # [0, 1]
-  miss: 0.45 # [0, 1]
-  min: 0.3  # [0, 1]
-  max: 0.7  # [0, 1]
+    sensor_model:
+
+      hit: 0.95  # [0, 1]
+      miss: 0.45 # [0, 1]
+      min: 0.3  # [0, 1]
+      max: 0.7  # [0, 1]
+
+    scope_timer:
+      enabled: false
+      log_filename: "/tmp/scope_timer_trajectory_generation.txt"

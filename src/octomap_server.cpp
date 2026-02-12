@@ -366,6 +366,11 @@ void OctomapServer::initialize() {
   }
 
   param_loader.loadParam("uav_name", _uav_name_);
+  param_loader.loadParam("world_frame_id", _world_frame_);
+  param_loader.loadParam("robot_frame_id", _robot_frame_);
+  param_loader.loadParam("map_path", _map_path_);
+
+  param_loader.setPrefix("mrs_octomap_server/octomap_server/");
 
   param_loader.loadParam("scope_timer/enabled", _scope_timer_enabled_);
 
@@ -393,10 +398,6 @@ void OctomapServer::initialize() {
   local_map_height_ = _local_map_height_max_;
 
   param_loader.loadParam("map_resolution", octree_resolution_);
-  param_loader.loadParam("world_frame_id", _world_frame_);
-  param_loader.loadParam("robot_frame_id", _robot_frame_);
-
-  param_loader.loadParam("map_path", _map_path_);
 
   param_loader.loadParam("sensor_params/2d_lidar/n_sensors", n_sensors_2d_lidar_);
   param_loader.loadParam("sensor_params/3d_lidar/n_sensors", n_sensors_3d_lidar_);
@@ -913,10 +914,14 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
         // change number of rays if it differs from the pointcloud dimensions
         if (sensor_params_3d_lidar_[sensor_id].horizontal_rays != static_cast<int>(cloud->width) ||
             sensor_params_3d_lidar_[sensor_id].vertical_rays != static_cast<int>(cloud->height)) {
+
           sensor_params_3d_lidar_[sensor_id].horizontal_rays = static_cast<int>(cloud->width);
           sensor_params_3d_lidar_[sensor_id].vertical_rays   = static_cast<int>(cloud->height);
-          RCLCPP_INFO_ONCE(node_->get_logger(), "changing sensor params for lidar %d to %d horizontal rays, %d vertical rays.", sensor_id,
-                           sensor_params_3d_lidar_[sensor_id].horizontal_rays, sensor_params_3d_lidar_[sensor_id].vertical_rays);
+
+          RCLCPP_INFO_ONCE(node_->get_logger(), "changing sensor params for lidar %d to %d horizontal rays, %d vertical rays, %.2f degs fov.", sensor_id,
+                           sensor_params_3d_lidar_[sensor_id].horizontal_rays, sensor_params_3d_lidar_[sensor_id].vertical_rays,
+                           (sensor_params_3d_lidar_[sensor_id].vertical_fov / M_PI) * 180.0);
+
           initialize3DLidarLUT(sensor_3d_lidar_xyz_lut_[sensor_id], sensor_params_3d_lidar_[sensor_id]);
         }
 
@@ -932,12 +937,15 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
         // change number of rays if it differs from the pointcloud dimensions
         if (sensor_params_depth_cam_[sensor_id].horizontal_rays != static_cast<int>(cloud->width) ||
             sensor_params_depth_cam_[sensor_id].vertical_rays != static_cast<int>(cloud->height)) {
+
           sensor_params_depth_cam_[sensor_id].horizontal_rays = static_cast<int>(cloud->width);
           sensor_params_depth_cam_[sensor_id].vertical_rays   = static_cast<int>(cloud->height);
+
           RCLCPP_INFO_ONCE(node_->get_logger(),
                            "changing sensor params for depth camera %d to %d horizontal rays, %d vertical rays, %.3f horizontal FOV, %.3f vertical FOV.",
                            sensor_id, sensor_params_depth_cam_[sensor_id].horizontal_rays, sensor_params_depth_cam_[sensor_id].vertical_rays,
                            sensor_params_depth_cam_[sensor_id].horizontal_fov * (180 / M_PI), sensor_params_depth_cam_[sensor_id].vertical_fov * (180 / M_PI));
+
           initializeDepthCamLUT(sensor_depth_camera_xyz_lut_[sensor_id], sensor_params_depth_cam_[sensor_id]);
         }
 
@@ -1012,19 +1020,6 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
     }
   }
 
-  if (decimation_enabled && !free_rays) {
-
-    RCLCPP_INFO_ONCE(node_->get_logger(), "decimating pointcloud");
-
-    pcl::VoxelGrid<pcl::PointXYZ> voxel_filter;
-
-    voxel_filter.setInputCloud(pc);
-
-    voxel_filter.setLeafSize(decimation_voxel_size, decimation_voxel_size, decimation_voxel_size);
-
-    voxel_filter.filter(*pc);
-  }
-
   // | ---------------------- robot removal --------------------- |
 
   bool   crop_robot_enabled = false;
@@ -1051,21 +1046,6 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
     default: {
       break;
     }
-  }
-
-  if (crop_robot_enabled && !free_rays) {
-
-    RCLCPP_INFO_ONCE(node_->get_logger(), "cropping robot's body");
-
-    // Remove points around the drone (apply crop to downsampled result)
-    pcl::CropBox<pcl::PointXYZ> box_filter;
-    Eigen::Vector4f             min_point(-crop_box_size / 2.0, -crop_box_size / 2.0, -crop_box_size / 2.0, 1.0);
-    Eigen::Vector4f             max_point(crop_box_size / 2.0, crop_box_size / 2.0, crop_box_size / 2.0, 1.0);
-    box_filter.setMin(min_point);
-    box_filter.setMax(max_point);
-    box_filter.setInputCloud(pc);  // use downsampled_cloud as input
-    box_filter.setNegative(true);
-    box_filter.filter(*pc);
   }
 
   // | ---------------- splitting the pointcloud ---------------- |
@@ -1129,7 +1109,10 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
 
       pcl::PointXYZ pt = pc->at(i);
 
+      /* if ((!std::isfinite(pt.x) || !std::isfinite(pt.y) || !std::isfinite(pt.z)) || (pt.x < 1e-3 && pt.y < 1e-3 && pt.z < 1e-3)) { */
       if ((!std::isfinite(pt.x) || !std::isfinite(pt.y) || !std::isfinite(pt.z))) {
+
+        RCLCPP_INFO_THROTTLE(node_->get_logger(), *clock_, 1000, "XXX: the pc contains nonfinite or 0 points");
 
         // datapoint is missing, update only free space, if desired
         vec3_t ray_vec;
@@ -1178,6 +1161,46 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
   free_vectors_pc->header = pc->header;
 
   // transform to the map frame
+
+  if (crop_robot_enabled && !free_rays) {
+
+    RCLCPP_INFO_ONCE(node_->get_logger(), "cropping robot's body");
+
+    // Remove points around the drone (apply crop to downsampled result)
+    pcl::CropBox<pcl::PointXYZ> box_filter;
+    Eigen::Vector4f             min_point(-crop_box_size / 2.0, -crop_box_size / 2.0, -crop_box_size / 2.0, 1.0);
+    Eigen::Vector4f             max_point(crop_box_size / 2.0, crop_box_size / 2.0, crop_box_size / 2.0, 1.0);
+    box_filter.setMin(min_point);
+    box_filter.setMax(max_point);
+    box_filter.setInputCloud(hit_pc);  // use downsampled_cloud as input
+    box_filter.setNegative(true);
+    box_filter.filter(*hit_pc);
+  }
+
+  if (decimation_enabled) {
+
+    RCLCPP_INFO_ONCE(node_->get_logger(), "decimating pointcloud");
+
+    {
+      pcl::VoxelGrid<pcl::PointXYZ> voxel_filter;
+
+      voxel_filter.setInputCloud(hit_pc);
+
+      voxel_filter.setLeafSize(decimation_voxel_size, decimation_voxel_size, decimation_voxel_size);
+
+      voxel_filter.filter(*hit_pc);
+    }
+
+    {
+      pcl::VoxelGrid<pcl::PointXYZ> voxel_filter;
+
+      voxel_filter.setInputCloud(free_vectors_pc);
+
+      voxel_filter.setLeafSize(decimation_voxel_size, decimation_voxel_size, decimation_voxel_size);
+
+      voxel_filter.filter(*free_vectors_pc);
+    }
+  }
 
   pcl::transformPointCloud(*hit_pc, *hit_pc, sensorToWorld);
   pcl::transformPointCloud(*free_vectors_pc, *free_vectors_pc, sensorToWorld);
@@ -1746,6 +1769,7 @@ void OctomapServer::initialize3DLidarLUT(xyz_lut_t& lut, const SensorParams3DLid
       const double x_coeff = cos(pAngle) * cos(yAngle);
       const double y_coeff = cos(pAngle) * sin(yAngle);
       const double z_coeff = sin(pAngle);
+
       coord_coeffs.push_back({x_coeff, y_coeff, z_coeff});
     }
   }
