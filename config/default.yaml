@@ -28,7 +28,7 @@ mrs_octomap_server:
       size: 80.0 # [m]
 
       # should create a global map from the local map?
-      enabled: true
+      enabled: false
 
       # the publisher rate of the global map
       publisher_rate: 1.0 # [Hz]
