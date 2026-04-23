@@ -101,7 +101,7 @@ install(
 
 install(
   DIRECTORY include/
-  DESTINATION .
+  DESTINATION include/
 )
 
 install(
