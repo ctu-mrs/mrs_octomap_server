@@ -6,6 +6,8 @@ mrs_octomap_server:
 
     map_while_grounded: true
 
+    auto_fill_frame_prefix: false
+
     local_map:
 
       # the bounding box distance of the local map

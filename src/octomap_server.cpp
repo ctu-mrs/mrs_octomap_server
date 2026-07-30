@@ -212,6 +212,8 @@ private:
 
   bool _scope_timer_enabled_;
 
+  bool _auto_fill_frame_prefix_;
+
   bool   _global_map_publish_full_;
   bool   _global_map_publish_binary_;
   bool   _global_map_enabled_;
@@ -371,6 +373,8 @@ void OctomapServer::initialize() {
   param_loader.loadParam("map_path", _map_path_);
 
   param_loader.setPrefix("mrs_octomap_server/octomap_server/");
+
+  param_loader.loadParam("auto_fill_frame_prefix", _auto_fill_frame_prefix_);
 
   param_loader.loadParam("scope_timer/enabled", _scope_timer_enabled_);
 
@@ -612,9 +616,12 @@ void OctomapServer::initialize() {
   /* transformer //{ */
 
   transformer_ = std::make_unique<mrs_lib::Transformer>(node_);
-  transformer_->setDefaultPrefix(_uav_name_);
   transformer_->setLookupTimeout(std::chrono::duration<double>(1.0));
   transformer_->retryLookupNewest(true);
+
+  if (_auto_fill_frame_prefix_) {
+    transformer_->setDefaultPrefix(_uav_name_);
+  }
 
   //}
 
@@ -934,19 +941,22 @@ void OctomapServer::callback3dLidarCloud2(const sensor_msgs::msg::PointCloud2::C
 
         std::scoped_lock lock(mutex_lut_);
 
-        // change number of rays if it differs from the pointcloud dimensions
-        if (sensor_params_depth_cam_[sensor_id].horizontal_rays != static_cast<int>(cloud->width) ||
-            sensor_params_depth_cam_[sensor_id].vertical_rays != static_cast<int>(cloud->height)) {
+        if (sensor_params_depth_cam_[sensor_id].update_free_space) {
 
-          sensor_params_depth_cam_[sensor_id].horizontal_rays = static_cast<int>(cloud->width);
-          sensor_params_depth_cam_[sensor_id].vertical_rays   = static_cast<int>(cloud->height);
+          // change number of rays if it differs from the pointcloud dimensions
+          if (sensor_params_depth_cam_[sensor_id].horizontal_rays != static_cast<int>(cloud->width) ||
+              sensor_params_depth_cam_[sensor_id].vertical_rays != static_cast<int>(cloud->height)) {
 
-          RCLCPP_INFO_ONCE(node_->get_logger(),
-                           "changing sensor params for depth camera %d to %d horizontal rays, %d vertical rays, %.3f horizontal FOV, %.3f vertical FOV.",
-                           sensor_id, sensor_params_depth_cam_[sensor_id].horizontal_rays, sensor_params_depth_cam_[sensor_id].vertical_rays,
-                           sensor_params_depth_cam_[sensor_id].horizontal_fov * (180 / M_PI), sensor_params_depth_cam_[sensor_id].vertical_fov * (180 / M_PI));
+            sensor_params_depth_cam_[sensor_id].horizontal_rays = static_cast<int>(cloud->width);
+            sensor_params_depth_cam_[sensor_id].vertical_rays   = static_cast<int>(cloud->height);
 
-          initializeDepthCamLUT(sensor_depth_camera_xyz_lut_[sensor_id], sensor_params_depth_cam_[sensor_id]);
+            RCLCPP_INFO_ONCE(node_->get_logger(),
+                             "changing sensor params for depth camera %d to %d horizontal rays, %d vertical rays, %.3f horizontal FOV, %.3f vertical FOV.",
+                             sensor_id, sensor_params_depth_cam_[sensor_id].horizontal_rays, sensor_params_depth_cam_[sensor_id].vertical_rays,
+                             sensor_params_depth_cam_[sensor_id].horizontal_fov * (180 / M_PI), sensor_params_depth_cam_[sensor_id].vertical_fov * (180 / M_PI));
+
+            initializeDepthCamLUT(sensor_depth_camera_xyz_lut_[sensor_id], sensor_params_depth_cam_[sensor_id]);
+          }
         }
 
         max_range = sensor_params_depth_cam_[sensor_id].max_range;
